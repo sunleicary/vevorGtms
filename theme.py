@@ -123,6 +123,29 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
     width:100%!important;
     margin:0!important;
 }
+
+/* Directly target Streamlit's keyed navigation buttons, independent of expander DOM. */
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button,
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button[kind="secondary"],
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button[kind="primary"] {
+    display:flex!important;
+    flex-direction:row!important;
+    justify-content:flex-start!important;
+    align-items:center!important;
+    text-align:left!important;
+    padding-left:10px!important;
+    padding-right:8px!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button > div,
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button [data-testid="stMarkdownContainer"],
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button [data-testid="stMarkdownContainer"] > p {
+    display:block!important;
+    flex:1 1 auto!important;
+    width:100%!important;
+    text-align:left!important;
+    margin-left:0!important;
+    margin-right:0!important;
+}
 </style>'''
 
 def apply_theme():
