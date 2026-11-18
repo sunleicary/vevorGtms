@@ -76,6 +76,30 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
 [data-testid="stSidebar"] .st-key-logout_user button p {color:#f4c7cd!important;font-weight:650!important}
 [data-testid="stSidebar"] .st-key-logout_user button:hover {background:#473044!important;border-color:#bb7786!important;color:#fff1f2!important}
 [data-testid="stSidebar"] .st-key-logout_user button:hover p {color:#fff1f2!important}
+
+/* Align every sidebar navigation label to the left, including nested tree items. */
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+    display:flex!important;
+    justify-content:flex-start!important;
+    text-align:left!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+[data-testid="stSidebar"] [data-testid="stExpander"] summary span {
+    text-align:left!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button {
+    width:100%!important;
+    display:flex!important;
+    justify-content:flex-start!important;
+    align-items:center!important;
+    text-align:left!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button > div,
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button p {
+    width:100%!important;
+    text-align:left!important;
+    margin-left:0!important;
+}
 </style>'''
 
 def apply_theme():
