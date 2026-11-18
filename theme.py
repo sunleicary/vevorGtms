@@ -61,6 +61,21 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
 [data-testid="stSidebar"] [data-testid="stExpander"] .stButton button[kind="primary"] p {font-weight:650!important}
 [data-testid="stSidebar"] [data-testid="stExpander"] .stButton button[kind="primary"]:hover {background:#2d4b6c!important}
 [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] > div {gap:.05rem!important}
+
+/* Dedicated logout action: subdued rose outline, separate from navigation selection. */
+[data-testid="stSidebar"] .st-key-logout_user button {
+    background:#2b2638!important;
+    color:#f4c7cd!important;
+    border:1px solid #684858!important;
+    border-radius:9px!important;
+    min-height:2.55rem!important;
+    font-weight:650!important;
+    box-shadow:none!important;
+    transition:background .16s ease,border-color .16s ease!important;
+}
+[data-testid="stSidebar"] .st-key-logout_user button p {color:#f4c7cd!important;font-weight:650!important}
+[data-testid="stSidebar"] .st-key-logout_user button:hover {background:#473044!important;border-color:#bb7786!important;color:#fff1f2!important}
+[data-testid="stSidebar"] .st-key-logout_user button:hover p {color:#fff1f2!important}
 </style>'''
 
 def apply_theme():
