@@ -1,7 +1,47 @@
 """Shared VEVOR-inspired visual theme for Streamlit pages."""
 import streamlit as st
 
-CSS = "/* VEVOR V0.98-inspired visual system. Presentation only; no business logic. */\n<style>\n:root {--vevor-navy:#071f56;--vevor-blue:#0c4aa0;--vevor-orange:#ff5418;--vevor-ice:#edf5ff}\n.stApp {background:linear-gradient(125deg,#f4f8ff 0%,#eaf3ff 75%,#e6f0ff 100%);color:#071f56}\n.block-container {max-width:1800px;padding-top:1rem;padding-bottom:2rem}\nh1,h2,h3,h4,h5 {color:#09275d;letter-spacing:-.025em}\nh3 {font-weight:800}\n[data-testid=\"stSidebar\"] {background:linear-gradient(180deg,#08275a 0%,#041934 100%);border-right:2px solid #163e79}\n[data-testid=\"stSidebar\"] [data-testid=\"stSidebarContent\"] {padding-top:1.1rem}\n[data-testid=\"stSidebar\"] * {color:#e8f2ff}\n[data-testid=\"stSidebar\"] [role=\"radiogroup\"] {gap:.28rem}\n[data-testid=\"stSidebar\"] [role=\"radiogroup\"] label {padding:.56rem .65rem;border-radius:10px;transition:background .15s ease}\n[data-testid=\"stSidebar\"] [role=\"radiogroup\"] label:has(input:checked) {background:linear-gradient(100deg,#ff6a1c,#f04411);box-shadow:0 4px 14px #ff5a2038}\n[data-testid=\"stSidebar\"] [role=\"radiogroup\"] label:hover {background-color:#23538b}\n[data-testid=\"stSidebar\"] [role=\"radiogroup\"] label:has(input:checked):hover {background:linear-gradient(100deg,#ff6a1c,#f04411)}\n[data-testid=\"stSidebar\"] [data-baseweb=\"select\"] *,[data-testid=\"stSidebar\"] [data-testid=\"stDateInput\"] input {color:#0b2b5f!important}\n[data-testid=\"stMetric\"] {background:linear-gradient(145deg,#fff,#eff6ff);border:1px solid #d2e2fa;border-top:3px solid #1d63cb;border-radius:12px;padding:.65rem .75rem;box-shadow:0 3px 9px #153e7810}\n[data-testid=\"stMetricLabel\"] {font-weight:700}\n[data-testid=\"stMetricValue\"] {color:#1152bc;font-weight:800}\n[data-testid=\"stVerticalBlockBorderWrapper\"] > div[style*=\"border\"] {border-color:#c9dcf7;border-radius:14px;box-shadow:0 4px 14px #19447b12;background:#fff}\n[data-testid=\"stDataFrame\"] {border:1px solid #d3e2f5;border-radius:10px;overflow:hidden}\n[data-testid=\"stTabs\"] [data-baseweb=\"tab-list\"] {gap:.2rem;border-bottom:2px solid #d5e4f8}\n[data-testid=\"stTabs\"] button[role=\"tab\"] {font-weight:750;color:#143b76;border-radius:9px 9px 0 0;padding:.55rem .85rem}\n[data-testid=\"stTabs\"] button[role=\"tab\"][aria-selected=\"true\"] {background:#0c4594;color:white}\n.stButton button[kind=\"primary\"],[data-testid=\"stFormSubmitButton\"] button[kind=\"primary\"] {background:#ff581b;border-color:#ff581b;color:white;font-weight:750}\n.stButton button:not([kind=\"primary\"]) {border-color:#bad0ef;color:#103c81}\n.stButton button:hover {border-color:#ff6427;color:#f04d12}\n.vevor-topbar {display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#fff;padding:14px 20px;border-radius:12px;border-top:4px solid #ff5b19;border-bottom:1px solid #d1e2f7;box-shadow:0 4px 16px #0b34701b;margin-bottom:.4rem}\n.vevor-logo {font-size:1.9rem;font-weight:1000;color:#ff5418;letter-spacing:-.065em;white-space:nowrap}\n.vevor-divider {height:33px;width:2px;background:#123d83}\n.vevor-title {font-size:1.42rem;font-weight:900;color:#071f56;flex:1;min-width:230px}\n.vevor-tag {font-size:.77rem;font-weight:750;background:#ff5a19;color:#fff;padding:7px 11px;border-radius:7px}\n.vevor-subtitle {font-size:.79rem;color:#46699b;margin:.25rem 0 .8rem .4rem}\n.vevor-sidebar-logo {background:#0b356d;border:1px solid #24548a;border-radius:12px;padding:14px 12px;margin-bottom:12px;color:#ff6428;font-size:1.55rem;font-weight:1000;letter-spacing:-.045em}\n.vevor-sidebar-logo span {display:block;font-size:.74rem;color:#d8e8ff;letter-spacing:0;font-weight:600;margin-top:3px}\ndiv[class*=\"st-key-overview_metric_\"] button {border:1px solid #d2e2f7!important;border-top:3px solid #0b5dcc!important;background:linear-gradient(145deg,#fff,#edf5ff)!important;border-radius:10px!important;padding:.22rem .45rem!important;min-height:2.3rem!important;justify-content:center!important;box-shadow:0 2px 9px #153e7814!important}\ndiv[class*=\"st-key-overview_metric_\"] button p {font-size:1.38rem!important;font-weight:850!important;color:#0b4ab0!important;line-height:1.2!important}\ndiv[class*=\"st-key-overview_metric_\"] button:hover {border-color:#ff6427!important;background:#fff4ee!important}\ndiv[class*=\"st-key-overview_metric_\"] button:hover p {color:#f04e16!important}\n@media(max-width:900px){.vevor-title{font-size:1.1rem}.vevor-logo{font-size:1.5rem}.block-container{padding-left:.8rem;padding-right:.8rem}}\n
+CSS = '''/* VEVOR V0.98-inspired visual system. Presentation only; no business logic. */
+<style>
+:root {--vevor-navy:#071f56;--vevor-blue:#0c4aa0;--vevor-orange:#ff5418;--vevor-ice:#edf5ff}
+.stApp {background:linear-gradient(125deg,#f4f8ff 0%,#eaf3ff 75%,#e6f0ff 100%);color:#071f56}
+.block-container {max-width:1800px;padding-top:1rem;padding-bottom:2rem}
+h1,h2,h3,h4,h5 {color:#09275d;letter-spacing:-.025em}
+h3 {font-weight:800}
+[data-testid="stSidebar"] {background:linear-gradient(180deg,#08275a 0%,#041934 100%);border-right:2px solid #163e79}
+[data-testid="stSidebar"] [data-testid="stSidebarContent"] {padding-top:1.1rem}
+[data-testid="stSidebar"] * {color:#e8f2ff}
+[data-testid="stSidebar"] [role="radiogroup"] {gap:.28rem}
+[data-testid="stSidebar"] [role="radiogroup"] label {padding:.56rem .65rem;border-radius:10px;transition:background .15s ease}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {background:linear-gradient(100deg,#ff6a1c,#f04411);box-shadow:0 4px 14px #ff5a2038}
+[data-testid="stSidebar"] [role="radiogroup"] label:hover {background-color:#23538b}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked):hover {background:linear-gradient(100deg,#ff6a1c,#f04411)}
+[data-testid="stSidebar"] [data-baseweb="select"] *,[data-testid="stSidebar"] [data-testid="stDateInput"] input {color:#0b2b5f!important}
+[data-testid="stMetric"] {background:linear-gradient(145deg,#fff,#eff6ff);border:1px solid #d2e2fa;border-top:3px solid #1d63cb;border-radius:12px;padding:.65rem .75rem;box-shadow:0 3px 9px #153e7810}
+[data-testid="stMetricLabel"] {font-weight:700}
+[data-testid="stMetricValue"] {color:#1152bc;font-weight:800}
+[data-testid="stVerticalBlockBorderWrapper"] > div[style*="border"] {border-color:#c9dcf7;border-radius:14px;box-shadow:0 4px 14px #19447b12;background:#fff}
+[data-testid="stDataFrame"] {border:1px solid #d3e2f5;border-radius:10px;overflow:hidden}
+[data-testid="stTabs"] [data-baseweb="tab-list"] {gap:.2rem;border-bottom:2px solid #d5e4f8}
+[data-testid="stTabs"] button[role="tab"] {font-weight:750;color:#143b76;border-radius:9px 9px 0 0;padding:.55rem .85rem}
+[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {background:#0c4594;color:white}
+.stButton button[kind="primary"],[data-testid="stFormSubmitButton"] button[kind="primary"] {background:#ff581b;border-color:#ff581b;color:white;font-weight:750}
+.stButton button:not([kind="primary"]) {border-color:#bad0ef;color:#103c81}
+.stButton button:hover {border-color:#ff6427;color:#f04d12}
+.vevor-topbar {display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#fff;padding:14px 20px;border-radius:12px;border-top:4px solid #ff5b19;border-bottom:1px solid #d1e2f7;box-shadow:0 4px 16px #0b34701b;margin-bottom:.4rem}
+.vevor-logo {font-size:1.9rem;font-weight:1000;color:#ff5418;letter-spacing:-.065em;white-space:nowrap}
+.vevor-divider {height:33px;width:2px;background:#123d83}
+.vevor-title {font-size:1.42rem;font-weight:900;color:#071f56;flex:1;min-width:230px}
+.vevor-tag {font-size:.77rem;font-weight:750;background:#ff5a19;color:#fff;padding:7px 11px;border-radius:7px}
+.vevor-subtitle {font-size:.79rem;color:#46699b;margin:.25rem 0 .8rem .4rem}
+.vevor-sidebar-logo {background:#0b356d;border:1px solid #24548a;border-radius:12px;padding:14px 12px;margin-bottom:12px;color:#ff6428;font-size:1.55rem;font-weight:1000;letter-spacing:-.045em}
+.vevor-sidebar-logo span {display:block;font-size:.74rem;color:#d8e8ff;letter-spacing:0;font-weight:600;margin-top:3px}
+div[class*="st-key-overview_metric_"] button {border:1px solid #d2e2f7!important;border-top:3px solid #0b5dcc!important;background:linear-gradient(145deg,#fff,#edf5ff)!important;border-radius:10px!important;padding:.22rem .45rem!important;min-height:2.3rem!important;justify-content:center!important;box-shadow:0 2px 9px #153e7814!important}
+div[class*="st-key-overview_metric_"] button p {font-size:1.38rem!important;font-weight:850!important;color:#0b4ab0!important;line-height:1.2!important}
+div[class*="st-key-overview_metric_"] button:hover {border-color:#ff6427!important;background:#fff4ee!important}
+div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
+@media(max-width:900px){.vevor-title{font-size:1.1rem}.vevor-logo{font-size:1.5rem}.block-container{padding-left:.8rem;padding-right:.8rem}}
+
 /* GTMS refined sidebar navigation: calm enterprise navy with muted blue selection. */
 [data-testid="stSidebar"] {background:#101e33!important;border-right:1px solid #273a54!important}
 [data-testid="stSidebar"] [data-testid="stSidebarContent"] {padding-top:1.1rem}
@@ -21,7 +61,7 @@ CSS = "/* VEVOR V0.98-inspired visual system. Presentation only; no business log
 [data-testid="stSidebar"] [data-testid="stExpander"] .stButton button[kind="primary"] p {font-weight:650!important}
 [data-testid="stSidebar"] [data-testid="stExpander"] .stButton button[kind="primary"]:hover {background:#2d4b6c!important}
 [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] > div {gap:.05rem!important}
-</style>"
+</style>'''
 
 def apply_theme():
     st.markdown(CSS, unsafe_allow_html=True)
