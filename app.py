@@ -111,7 +111,7 @@ with st.sidebar:
             for item in navigation[domain]:
                 active = item == module
                 if st.button(
-                    f'{"   " if not active else "▏ "}{item}',
+                    f'{"▏ " if active else ""}{item}',
                     key=f"gtms_tree_{domain}_{item}",
                     use_container_width=True,
                     type="primary" if active else "secondary",
