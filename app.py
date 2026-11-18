@@ -17,6 +17,7 @@ from theme import apply_theme
 from auth import login_gate, manage_users, change_own_password
 from database_backup import show_database_backup
 from database_status import show_database_status
+from drayage_suppliers import show_drayage_suppliers
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -80,6 +81,7 @@ with st.sidebar:
     if user["role"] == "管理员":
         pages.append("用户管理")
         pages.append("数据库备份中心")
+    pages.append("港前港后拖车供应商管理")
     pages.append("我的账号")
     page = st.radio("业务模块", pages)
     if st.button("退出登录", key="logout_user"):
@@ -87,7 +89,11 @@ with st.sidebar:
         st.session_state.pop("sqlite_backup_zip", None)
         st.session_state.pop("sqlite_backup_filename", None)
         st.rerun()
-    st.caption("统计业务主键：排柜单号；供应商仅使用港后拖车行。")
+    st.caption("运营报表按排柜单号统计，港后报表使用港后拖车行。")
+
+if page == "港前港后拖车供应商管理":
+    show_drayage_suppliers(user)
+    st.stop()
 
 if page == "数据库连接状态":
     show_database_status(user, DB)
