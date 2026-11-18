@@ -74,11 +74,6 @@ with st.sidebar:
     st.caption(f'当前用户：{user["username"]} · {user["role"]}')
     # Five business domains; labels are kept separate from legacy handlers.
     navigation = {
-        "权限管理": ["角色管理", "用户管理"],
-        "企业主数据管理": [
-            "全球国家与业务区域管理", "全球港后港口与码头管理",
-            "船司管理", "清关行管理", "海外仓主数据管理", "拖车行主数据管理",
-        ],
         "港后运营管理": [
             "港后运营工作台", "港后LFD智能预警管理",
             "港后供应商产能与计划管理", "港后供应商绩效KPI管理",
@@ -86,6 +81,11 @@ with st.sidebar:
         "港后拖车行结算管理": [
             "拖车行合同管理", "拖车行异常费用管理", "账期与费用结算管理",
         ],
+        "企业主数据管理": [
+            "全球国家与业务区域管理", "全球港后港口与码头管理",
+            "船司管理", "清关行管理", "海外仓主数据管理", "拖车行主数据管理",
+        ],
+        "权限管理": ["角色管理", "用户管理"],
         "系统管理": ["系统数据备份", "业务数据导入管理", "数据库连接状态管理"],
     }
     admin_domains = {"权限管理", "系统管理"}
@@ -93,8 +93,8 @@ with st.sidebar:
                        if domain not in admin_domains or user["role"] == "管理员"]
     # Tree navigation: expand/collapse first-level groups and click child pages.
     icons = {
-        "权限管理": "01", "企业主数据管理": "02",
-        "港后运营管理": "03", "港后拖车行结算管理": "04",
+        "港后运营管理": "01", "港后拖车行结算管理": "02",
+        "企业主数据管理": "03", "权限管理": "04",
         "系统管理": "05",
     }
     default_module = "港后运营工作台"
@@ -144,7 +144,8 @@ with st.sidebar:
         }
         view = st.selectbox("工作台视图", list(workbench_views), key="gtms_workbench_view")
         page = workbench_views[view]
-    if st.button("退出登录", key="logout_user"):
+    st.divider()
+    if st.button("↪ 退出登录", key="logout_user", use_container_width=True):
         st.session_state.pop("auth_username", None)
         st.session_state.pop("sqlite_backup_zip", None)
         st.session_state.pop("sqlite_backup_filename", None)
