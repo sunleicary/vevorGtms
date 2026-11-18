@@ -91,8 +91,33 @@ with st.sidebar:
     admin_domains = {"权限管理", "系统管理"}
     visible_domains = [domain for domain in navigation
                        if domain not in admin_domains or user["role"] == "管理员"]
-    domain = st.selectbox("功能模块", visible_domains, key="gtms_domain")
-    module = st.radio("功能菜单", navigation[domain], key=f"gtms_nav_{domain}")
+    # Tree navigation: expand/collapse first-level groups and click child pages.
+    icons = {
+        "权限管理": "🔐", "企业主数据管理": "🗂️",
+        "港后运营管理": "🚢", "港后拖车行结算管理": "💰",
+        "系统管理": "⚙️",
+    }
+    default_module = "港后运营工作台"
+    if st.session_state.get("gtms_active_module") not in [
+        item for group in visible_domains for item in navigation[group]
+    ]:
+        st.session_state["gtms_active_module"] = default_module
+    module = st.session_state["gtms_active_module"]
+    for domain in visible_domains:
+        with st.expander(
+            f'{icons[domain]} {domain}',
+            expanded=module in navigation[domain],
+        ):
+            for item in navigation[domain]:
+                active = item == module
+                if st.button(
+                    f'{"▸ " if not active else "● "}{item}',
+                    key=f"gtms_tree_{domain}_{item}",
+                    use_container_width=True,
+                    type="primary" if active else "secondary",
+                ):
+                    st.session_state["gtms_active_module"] = item
+                    st.rerun()
     page_aliases = {
         "用户管理": "用户管理",
         "拖车行主数据管理": "港前港后拖车供应商管理",
