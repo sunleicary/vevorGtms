@@ -72,24 +72,76 @@ user = login_gate()
 with st.sidebar:
     st.markdown('<div class="vevor-sidebar-logo">VEVOR®<span>全球港后运营管理</span></div>', unsafe_allow_html=True)
     st.caption(f'当前用户：{user["username"]} · {user["role"]}')
-    pages = ["运营总览", "全球港后运营总览", "全美港后供应商总览", "货柜查询", "货柜详情", "LFD预警", "拖车商分析", "港后供应商KPI考核"]
-    pages += ["🧠 智能运营中心｜LFD预警与催办", "🧠 智能运营中心｜AI异常费用审核", "🧠 智能运营中心｜供应商绩效与产能"]
-    if user["role"] == "管理员":
-        pages.append("数据管理")
-        pages.append("数据库连接状态")
-        pages.append("业务主键质量检查")
-    if user["role"] == "管理员":
-        pages.append("用户管理")
-        pages.append("数据库备份中心")
-    pages.append("港前港后拖车供应商管理")
-    pages.append("我的账号")
-    page = st.radio("业务模块", pages)
+    # Five business domains; labels are kept separate from legacy handlers.
+    navigation = {
+        "权限管理": ["角色管理", "用户管理"],
+        "企业主数据管理": [
+            "全球国家与业务区域管理", "全球港后港口与码头管理",
+            "船司管理", "清关行管理", "海外仓主数据管理", "拖车行主数据管理",
+        ],
+        "港后运营管理": [
+            "港后运营工作台", "港后LFD智能预警管理",
+            "港后供应商产能与计划管理", "港后供应商绩效KPI管理",
+        ],
+        "港后拖车行结算管理": [
+            "拖车行合同管理", "拖车行异常费用管理", "账期与费用结算管理",
+        ],
+        "系统管理": ["系统数据备份", "业务数据导入管理", "数据库连接状态管理"],
+    }
+    admin_domains = {"权限管理", "系统管理"}
+    visible_domains = [domain for domain in navigation
+                       if domain not in admin_domains or user["role"] == "管理员"]
+    domain = st.selectbox("功能模块", visible_domains, key="gtms_domain")
+    module = st.radio("功能菜单", navigation[domain], key=f"gtms_nav_{domain}")
+    page_aliases = {
+        "用户管理": "用户管理",
+        "拖车行主数据管理": "港前港后拖车供应商管理",
+        "港后LFD智能预警管理": "🧠 智能运营中心｜LFD预警与催办",
+        "港后供应商产能与计划管理": "🧠 智能运营中心｜供应商绩效与产能",
+        "港后供应商绩效KPI管理": "港后供应商KPI考核",
+        "拖车行异常费用管理": "🧠 智能运营中心｜AI异常费用审核",
+        "系统数据备份": "数据库备份中心",
+        "业务数据导入管理": "数据管理",
+        "数据库连接状态管理": "数据库连接状态",
+    }
+    page = page_aliases.get(module, module)
+    if module == "港后运营工作台":
+        # Preserve all existing reporting functions inside the operations workbench.
+        workbench_views = {
+            "运营总览": "运营总览",
+            "全球港后运营总览": "全球港后运营总览",
+            "全美港后供应商总览": "全美港后供应商总览",
+            "货柜查询": "货柜查询",
+            "货柜详情": "货柜详情",
+            "LFD预警": "LFD预警",
+            "拖车商分析": "拖车商分析",
+            "港后供应商KPI考核": "港后供应商KPI考核",
+        }
+        view = st.selectbox("工作台视图", list(workbench_views), key="gtms_workbench_view")
+        page = workbench_views[view]
     if st.button("退出登录", key="logout_user"):
         st.session_state.pop("auth_username", None)
         st.session_state.pop("sqlite_backup_zip", None)
         st.session_state.pop("sqlite_backup_filename", None)
         st.rerun()
     st.caption("运营报表按排柜单号统计，港后报表使用港后拖车行。")
+
+# Pages without a migrated backend are visible as planned modules, not fake data forms.
+planned_modules = {
+    "角色管理": "角色与页面权限矩阵将在后续版本接入现有登录体系。",
+    "全球国家与业务区域管理": "待建设国家、区域和业务覆盖范围主数据。",
+    "全球港后港口与码头管理": "待建设港口、码头及国家区域关联主数据。",
+    "船司管理": "待建设船公司主数据与标准编码。",
+    "清关行管理": "待建设清关服务商主数据。",
+    "海外仓主数据管理": "待建设海外仓地址、区域及收货规则主数据。",
+    "拖车行合同管理": "待建设合同、线路报价和生效日期管理。",
+    "账期与费用结算管理": "待建设对账、账期和结算管理。",
+}
+if page in planned_modules:
+    st.title(page)
+    st.info(planned_modules[page])
+    st.caption("当前为菜单占位页面，尚未接入数据库或启用编辑操作。")
+    st.stop()
 
 if page == "港前港后拖车供应商管理":
     show_drayage_suppliers(user)
