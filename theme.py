@@ -100,6 +100,29 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
     text-align:left!important;
     margin-left:0!important;
 }
+
+/* Force expanded second-level navigation labels to align at the left edge. */
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] .stButton,
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] .stButton > div,
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] .stButton button {
+    width:100%!important;
+    text-align:left!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] .stButton button {
+    justify-content:flex-start!important;
+    padding-left:.55rem!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] .stButton button [data-testid="stMarkdownContainer"] {
+    display:block!important;
+    flex:1 1 auto!important;
+    width:100%!important;
+    text-align:left!important;
+}
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] .stButton button [data-testid="stMarkdownContainer"] p {
+    text-align:left!important;
+    width:100%!important;
+    margin:0!important;
+}
 </style>'''
 
 def apply_theme():
