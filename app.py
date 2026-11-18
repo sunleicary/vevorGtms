@@ -93,9 +93,9 @@ with st.sidebar:
                        if domain not in admin_domains or user["role"] == "管理员"]
     # Tree navigation: expand/collapse first-level groups and click child pages.
     icons = {
-        "权限管理": "🔐", "企业主数据管理": "🗂️",
-        "港后运营管理": "🚢", "港后拖车行结算管理": "💰",
-        "系统管理": "⚙️",
+        "权限管理": "01", "企业主数据管理": "02",
+        "港后运营管理": "03", "港后拖车行结算管理": "04",
+        "系统管理": "05",
     }
     default_module = "港后运营工作台"
     if st.session_state.get("gtms_active_module") not in [
@@ -111,7 +111,7 @@ with st.sidebar:
             for item in navigation[domain]:
                 active = item == module
                 if st.button(
-                    f'{"▸ " if not active else "● "}{item}',
+                    f'{"   " if not active else "▏ "}{item}',
                     key=f"gtms_tree_{domain}_{item}",
                     use_container_width=True,
                     type="primary" if active else "secondary",
