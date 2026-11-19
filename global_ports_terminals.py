@@ -199,6 +199,34 @@ def sync(conn):
     updated,conflicts,unresolved=infer_port_countries(conn,cols,port_fields)
     return len(ports_added),len(terminals_added),updated,conflicts,unresolved
 
+def upgrade_v2_geography(conn):
+    """Idempotent schema extension and PNCT association correction."""
+    for table in ("gtms_ports_v2","gtms_terminals_v2"):
+        cols=table_columns(conn,table)
+        for field in ("state_code","operating_region_code"):
+            if field not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
+    for name,state,region in [("ATLANTA","GA","US-ATL"),("HOUSTON","TX","US-HOU"),("LONG BEACH","CA","US-LALB"),("LOS ANGELES","CA","US-LALB"),("SAVANNAH","GA","US-SAV"),("SEATTLE","WA","US-LALB"),("TACOMA","WA","US-LALB")]:
+        conn.execute("UPDATE gtms_ports_v2 SET state_code=?,operating_region_code=? WHERE country_code='US' AND (UPPER(port_name)=? OR UPPER(port_name) LIKE ?) AND state_code=''",(state,region,name,name+",%"))
+    pnct=conn.execute("SELECT terminal_id FROM gtms_terminals_v2 WHERE UPPER(terminal_name) LIKE '%PORT NEWARK CONTAINER TERMINAL%' OR UPPER(TRIM(terminal_name))='PNCT'").fetchall()
+    if pnct:
+        port=conn.execute("SELECT port_id FROM gtms_ports_v2 WHERE UPPER(TRIM(port_name))='PORT NEWARK' AND country_code='US' LIMIT 1").fetchone()
+        if port:
+            pid=port["port_id"]
+        else:
+            pid=int(conn.execute("SELECT COALESCE(MAX(port_id),0)+1 AS n FROM gtms_ports_v2").fetchone()["n"])
+            conn.execute("INSERT INTO gtms_ports_v2(port_id,port_name,country_code,unlocode,canonical_port_id,classification,legacy_port_id,state_code,operating_region_code) VALUES (?,?,?,?,?,?,?,?,?)",(pid,"PORT NEWARK","US","USNWK",pid,"seaport_or_port_city","gtms-system-port-newark","NJ","US-NJ"))
+        conn.execute("UPDATE gtms_ports_v2 SET state_code='NJ',operating_region_code='US-NJ' WHERE port_id=?",(pid,))
+        for t in pnct:
+            conn.execute("UPDATE gtms_terminals_v2 SET port_id=?,state_code='NJ',operating_region_code='US-NJ' WHERE terminal_id=?",(pid,t["terminal_id"]))
+    for pattern in ("%MAHER%","%APM TERMINALS ELIZABETH%","%PORT LIBERTY BAYONNE%","%GCT BAYONNE%"):
+        conn.execute("UPDATE gtms_terminals_v2 SET state_code='NJ',operating_region_code='US-NJ' WHERE UPPER(terminal_name) LIKE ? AND state_code=''",(pattern,))
+    conn.execute("""UPDATE gtms_terminals_v2 SET
+        state_code=(SELECT p.state_code FROM gtms_ports_v2 p WHERE p.port_id=gtms_terminals_v2.port_id),
+        operating_region_code=(SELECT p.operating_region_code FROM gtms_ports_v2 p WHERE p.port_id=gtms_terminals_v2.port_id)
+        WHERE state_code='' AND port_id IN (SELECT port_id FROM gtms_ports_v2 WHERE state_code<>'')""")
+
+
 def show_global_ports_terminals(user, db):
     st.title("全球港口与码头管理")
     st.caption("整数主键版本：港口、码头分别使用 BIGINT；旧字符型主数据只读保留，避免破坏既有业务关联。")
@@ -211,6 +239,7 @@ def show_global_ports_terminals(user, db):
         if len(available)!=2:
             st.warning("尚未初始化整数主键数据库。请先在 Neon SQL Editor 执行 gtms_integer_ids_neon_seed.sql；不会覆盖旧表。")
             return
+        upgrade_v2_geography(conn)
         ports=[dict(r) for r in conn.execute("SELECT * FROM gtms_ports_v2 ORDER BY port_id").fetchall()]
         terminals=[dict(r) for r in conn.execute("SELECT * FROM gtms_terminals_v2 ORDER BY terminal_id").fetchall()]
     c1,c2,c3=st.columns(3)
@@ -249,6 +278,8 @@ def show_global_ports_terminals(user, db):
             country=st.text_input("国家代码",current.get("country_code",""))
             locode=st.text_input("UN/LOCODE",current.get("unlocode",""))
             classification=st.text_input("分类",current.get("classification","seaport_or_port_city"))
+            state=st.text_input("州/省代码",current.get("state_code",""))
+            region=st.text_input("运营区域",current.get("operating_region_code",""))
         else:
             port_options={p["port_id"]:p["port_name"] for p in ports}
             if not port_options:
@@ -256,6 +287,8 @@ def show_global_ports_terminals(user, db):
                 return
             keys=list(port_options)
             selected_port=st.selectbox("所属港口",keys,index=keys.index(current["port_id"]) if current.get("port_id") in keys else 0,format_func=lambda x:f"{x} · {port_options[x]}")
+            state=st.text_input("州/省代码",current.get("state_code",""))
+            region=st.text_input("运营区域",current.get("operating_region_code",""))
             operator=st.text_input("运营商",current.get("operator_name",""))
             terminal_type=st.text_input("码头类型",current.get("terminal_type","container"))
             source_url=st.text_input("核验来源",current.get("source_url",""))
@@ -276,13 +309,13 @@ def show_global_ports_terminals(user, db):
                 next_id=int(selection)
             if kind=="港口":
                 if selection=="新增":
-                    conn.execute("INSERT INTO gtms_ports_v2(port_id,port_name,country_code,unlocode,canonical_port_id,classification,legacy_port_id) VALUES (?,?,?,?,?,?,?)",(next_id,name,country.upper().strip(),locode.upper().strip(),next_id,classification,"manual-"+str(next_id)))
+                    conn.execute("INSERT INTO gtms_ports_v2(port_id,port_name,country_code,unlocode,canonical_port_id,classification,legacy_port_id,state_code,operating_region_code) VALUES (?,?,?,?,?,?,?,?,?)",(next_id,name,country.upper().strip(),locode.upper().strip(),next_id,classification,"manual-"+str(next_id),state.upper().strip(),region.upper().strip()))
                 else:
-                    conn.execute("UPDATE gtms_ports_v2 SET port_name=?,country_code=?,unlocode=?,classification=? WHERE port_id=?",(name,country.upper().strip(),locode.upper().strip(),classification,next_id))
+                    conn.execute("UPDATE gtms_ports_v2 SET port_name=?,country_code=?,unlocode=?,classification=?,state_code=?,operating_region_code=? WHERE port_id=?",(name,country.upper().strip(),locode.upper().strip(),classification,state.upper().strip(),region.upper().strip(),next_id))
             else:
                 if selection=="新增":
-                    conn.execute("INSERT INTO gtms_terminals_v2(terminal_id,terminal_name,port_id,operator_name,terminal_type,source_url,verification_status,legacy_terminal_id) VALUES (?,?,?,?,?,?,?,?)",(next_id,name,selected_port,operator,terminal_type,source_url,verification,"manual-"+str(next_id)))
+                    conn.execute("INSERT INTO gtms_terminals_v2(terminal_id,terminal_name,port_id,operator_name,terminal_type,source_url,verification_status,legacy_terminal_id,state_code,operating_region_code) VALUES (?,?,?,?,?,?,?,?,?,?)",(next_id,name,selected_port,operator,terminal_type,source_url,verification,"manual-"+str(next_id),state.upper().strip(),region.upper().strip()))
                 else:
-                    conn.execute("UPDATE gtms_terminals_v2 SET terminal_name=?,port_id=?,operator_name=?,terminal_type=?,source_url=?,verification_status=? WHERE terminal_id=?",(name,selected_port,operator,terminal_type,source_url,verification,next_id))
+                    conn.execute("UPDATE gtms_terminals_v2 SET terminal_name=?,port_id=?,operator_name=?,terminal_type=?,source_url=?,verification_status=?,state_code=?,operating_region_code=? WHERE terminal_id=?",(name,selected_port,operator,terminal_type,source_url,verification,state.upper().strip(),region.upper().strip(),next_id))
         st.success("保存成功")
         st.rerun()
