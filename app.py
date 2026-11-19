@@ -172,6 +172,10 @@ if page == "全球国家与业务区域管理":
     show_country_regions(user, DB)
     st.stop()
 
+if page == "全球港口与码头管理":
+    show_global_ports_terminals(user, DB)
+    st.stop()
+
 if page == "角色管理":
     manage_roles(user)
     st.stop()
