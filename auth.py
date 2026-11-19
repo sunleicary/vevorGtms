@@ -12,7 +12,88 @@ import psycopg
 import streamlit as st
 
 AUTH_DB = os.environ.get("AUTH_DB_PATH", os.path.join(os.path.dirname(__file__), "users.db"))
-ROLES = ("管理员", "运营人员", "只读用户")
+ROLES = ("系统管理员", "港后运营人员", "港后拖车商", "财务结算", "海外仓运营人员")
+LEGACY_ROLES = {"管理员": "系统管理员", "运营人员": "港后运营人员", "只读用户": "海外仓运营人员"}
+MODULES = {
+    "港后运营管理": ["港后运营工作台", "港后LFD智能预警管理", "港后供应商产能与计划管理", "港后供应商绩效KPI管理"],
+    "港后拖车行结算管理": ["拖车行合同管理", "拖车行异常费用管理", "账期与费用结算管理"],
+    "企业主数据管理": ["全球国家与业务区域管理", "全球港后港口与码头管理", "船司管理", "清关行管理", "海外仓主数据管理", "拖车行主数据管理"],
+    "权限管理": ["角色管理", "用户管理"],
+    "系统管理": ["系统数据备份", "业务数据导入管理", "数据库连接状态管理"],
+}
+ALL_MODULES = [name for group in MODULES.values() for name in group]
+DEFAULT_PERMISSIONS = {
+    "系统管理员": ALL_MODULES,
+    "港后运营人员": MODULES["港后运营管理"] + ["拖车行异常费用管理", "全球国家与业务区域管理", "全球港后港口与码头管理", "船司管理", "清关行管理", "海外仓主数据管理", "拖车行主数据管理"],
+    # External suppliers must not access unscoped business reports until supplier-level isolation is implemented.
+    "港后拖车商": [],
+    "财务结算": ["拖车行合同管理", "拖车行异常费用管理", "账期与费用结算管理"],
+    "海外仓运营人员": [],
+}
+def canonical_role(role):
+    return LEGACY_ROLES.get(role, role)
+def is_admin(user):
+    return canonical_role(user["role"]) == "系统管理员"
+def ensure_roles():
+    with _connect() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS gtms_role_permissions (
+            role TEXT NOT NULL, module TEXT NOT NULL,
+            PRIMARY KEY (role, module)
+        )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS gtms_roles (
+            role TEXT PRIMARY KEY, description TEXT NOT NULL DEFAULT ''
+        )""")
+        for role in ROLES:
+            conn.execute("INSERT INTO gtms_roles (role, description) VALUES (?, ?) ON CONFLICT (role) DO NOTHING", (role, "系统预设角色"))
+            existing = conn.execute("SELECT COUNT(*) FROM gtms_role_permissions WHERE role=?", (role,)).fetchone()[0]
+            if not existing:
+                for module in DEFAULT_PERMISSIONS[role]:
+                    conn.execute("INSERT INTO gtms_role_permissions (role, module) VALUES (?, ?) ON CONFLICT (role, module) DO NOTHING", (role, module))
+        # Convert legacy roles without losing existing user accounts or password hashes.
+        for old, new in LEGACY_ROLES.items():
+            conn.execute("UPDATE users SET role=? WHERE role=?", (new, old))
+def permitted_modules(user):
+    role = canonical_role(user["role"])
+    if role == "系统管理员":
+        return set(ALL_MODULES)
+    with _connect() as conn:
+        return {r["module"] for r in conn.execute("SELECT module FROM gtms_role_permissions WHERE role=?", (role,)).fetchall()}
+def manage_roles(user):
+    if not is_admin(user):
+        st.error("仅系统管理员可管理角色。")
+        return
+    st.title("角色管理")
+    st.caption("角色权限保存在当前数据库；变更后用户下次页面刷新生效。外部供应商数据隔离未完成前不开放业务数据页面。")
+    ensure_roles()
+    with _connect() as conn:
+        rows = conn.execute("SELECT role, module FROM gtms_role_permissions").fetchall()
+    grants = {(r["role"], r["module"]) for r in rows}
+    role = st.selectbox("选择角色", ROLES)
+    if role == "系统管理员":
+        st.info("系统管理员拥有全部权限，不允许取消。")
+    elif role in ("港后拖车商", "海外仓运营人员"):
+        st.warning("此角色涉及业务数据隔离，目前仅预留角色身份，不开放未隔离的数据页面。")
+    with st.form("role_permissions"):
+        chosen = []
+        for group, modules in MODULES.items():
+            st.markdown("**" + group + "**")
+            for module in modules:
+                allowed = (role, module) in grants
+                locked = role == "系统管理员" or role in ("港后拖车商", "海外仓运营人员") or group in ("权限管理", "系统管理")
+                if st.checkbox(module, value=allowed or role == "系统管理员", disabled=locked, key="role_" + role + "_" + module):
+                    chosen.append(module)
+        save = st.form_submit_button("保存角色权限", disabled=role == "系统管理员" or role in ("港后拖车商", "海外仓运营人员"))
+    if save:
+        with _connect() as conn:
+            conn.execute("DELETE FROM gtms_role_permissions WHERE role=?", (role,))
+            for module in chosen:
+                if module not in MODULES["权限管理"] + MODULES["系统管理"]:
+                    conn.execute("INSERT INTO gtms_role_permissions (role, module) VALUES (?, ?)", (role, module))
+        st.success("角色权限已保存。")
+        st.rerun()
+    st.subheader("角色权限概览")
+    st.dataframe([{"角色": r, "已授权页面数": len(ALL_MODULES) if r == "系统管理员" else sum((r,m) in grants for m in ALL_MODULES)} for r in ROLES], hide_index=True, use_container_width=True)
+
 
 
 def _connect():
@@ -54,7 +135,7 @@ def bootstrap():
         salt, digest = _new_password(initial)
         now = datetime.now(timezone.utc).isoformat()
         conn.execute("INSERT INTO users VALUES (?,?,?,?,?,?,?)",
-                     ("admin", salt, digest, "管理员", 1, now, now))
+                     ("admin", salt, digest, "系统管理员", 1, now, now))
     return True
 
 
@@ -89,6 +170,7 @@ def login_gate():
     if not bootstrap():
         st.error("尚未初始化管理员。请在 Streamlit Cloud → App settings → Secrets 配置长度至少 12 位的 ADMIN_PASSWORD。")
         st.stop()
+    ensure_roles()
     user = current_user()
     if user:
         return user
@@ -124,7 +206,7 @@ def _verified_user(username):
 
 
 def manage_users(user):
-    if user["role"] != "管理员":
+    if not is_admin(user):
         st.error("仅管理员可访问用户管理。")
         return
     st.subheader("👥 用户管理")
