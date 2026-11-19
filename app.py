@@ -23,6 +23,7 @@ from global_ports_terminals import show_global_ports_terminals
 from shipping_lines import show_shipping_lines
 from customs_brokers import show_customs_brokers
 from warehouses import show_warehouses
+from drayage_master import show_drayage_master
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -174,6 +175,10 @@ if page == "全球国家与业务区域管理":
 
 if page == "全球港口与码头管理":
     show_global_ports_terminals(user, DB)
+    st.stop()
+
+if page == "拖车行主数据管理":
+    show_drayage_master(user, DB)
     st.stop()
 
 if page == "海外仓主数据管理":
