@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 from db_backend import connect as db_connect, is_neon
 from auth import is_admin
+from country_regions import _alias_index, _initialize as initialize_countries
 
 PORT_FIELDS = ("起运港","装货港","出运港","出口港","始发港","卸货港","目的港","到达港","进口港","港口","Port of Loading","POL","Port of Discharge","POD")
 PRE_PORT_FIELDS = {"起运港","装货港","出运港","出口港","始发港","Port of Loading","POL"}
@@ -49,6 +50,38 @@ def _side(field, kind, columns):
         if field in POST_TERMINAL_FIELDS: return "港后"
     # Shared columns have no reliable business-side attribution.
     return "未区分"
+
+def infer_port_countries(conn, cols, port_fields):
+    """Use observed country values, never assign when observations conflict.
+
+    Destination warehouse country is a business-derived candidate, not
+    independent geographic verification of a port's location.
+    """
+    if "目的仓国家" not in cols:
+        return 0,0
+    initialize_countries(conn)
+    aliases=_alias_index(conn)
+    assigned=0
+    conflicts=0
+    for field in port_fields:
+        query='SELECT "'+field+'" AS port_raw,"目的仓国家" AS country_raw,COUNT(*) AS cnt FROM containers GROUP BY "'+field+'","目的仓国家"'
+        observations={}
+        for row in conn.execute(query).fetchall():
+            name=clean(row["port_raw"])
+            if not name:
+                continue
+            code=aliases.get(str(row["country_raw"] or "").strip().upper())
+            if code:
+                observations.setdefault(uid("port",name),set()).add(code)
+        for pid,codes in observations.items():
+            if len(codes)!=1:
+                conflicts+=1
+                continue
+            code=next(iter(codes))
+            # Do not overwrite an existing manually curated country.
+            result=conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=? AND (country_code='' OR country_code IS NULL)",(code,pid))
+            assigned+=max(0,result.rowcount)
+    return assigned,conflicts
 
 def sync(conn):
     cols=table_columns(conn,"containers")
@@ -99,11 +132,12 @@ def sync(conn):
                 VALUES (?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET record_count=excluded.record_count""",
                 (sid,"terminal",tid,field,side,int(row["cnt"])))
             terminals_added.add(tid)
-    return len(ports_added),len(terminals_added)
+    inferred,conflicts=infer_port_countries(conn,cols,port_fields)
+    return len(ports_added),len(terminals_added),inferred,conflicts
 
 def show_global_ports_terminals(user, db):
     st.title("全球港口与码头管理")
-    st.caption("港前港后共用主数据；仅依据实际存在的业务字段初始化。港口国家、UN/LOCODE及码头归属不作未经核实的推断。")
+    st.caption("港前港后共用主数据；仅依据实际存在的业务字段初始化。港口国家依据业务记录中的目的仓国家辅助填充；跨国运输可能造成偏差，冲突不自动覆盖。UN/LOCODE不作推断。")
     with db_connect(db) as conn:
         initialize(conn)
         try:
@@ -119,6 +153,7 @@ def show_global_ports_terminals(user, db):
     a.metric("港口",len(ports))
     b.metric("码头",len(terminals))
     c.metric("本次发现的港口/码头",str(counts[0])+" / "+str(counts[1]))
+    st.caption(f"依据目的仓国家字段填充了 {counts[2]} 条原先为空的港口国家；存在 {counts[3]} 次来源国家冲突，未自动覆盖。目的仓国家不一定等于港口所在地，建议核对跨国运输港口。")
     st.caption("同步只补充缺失的主数据并刷新来源计数，不覆盖人工编辑字段。")
     tab1,tab2,tab3=st.tabs(["港口主数据","码头主数据","业务来源与统计"])
     with tab1:
