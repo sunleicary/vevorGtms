@@ -85,7 +85,8 @@ def show_shipping_lines(user, db):
         st.dataframe(pd.DataFrame(sources),hide_index=True,use_container_width=True)
         st.download_button("导出原始名称映射 CSV",pd.DataFrame(sources).to_csv(index=False).encode("utf-8-sig"),"gtms_shipping_line_sources.csv","text/csv")
     if not is_admin(user): return
-    st.subheader("维护船司主数据")
+    st.subheader("主数据标准操作：增加 / 修改 / 删除 / 查询")
+    st.caption("查询与导出在上方；新增和修改在下方。删除操作需要二次确认，已有业务来源关联的船司不可直接删除。")
     options={str(r["carrier_id"]):r for r in lines}
     choice=st.selectbox("选择船司",["新增"]+list(options),format_func=lambda k:"新增船司" if k=="新增" else f"{k} · {options[k]['carrier_name']}")
     current=options.get(choice,{})
@@ -108,4 +109,26 @@ def show_shipping_lines(user, db):
             else:
                 conn.execute("UPDATE gtms_shipping_lines SET carrier_name=?,carrier_code=?,aliases=?,enabled=?,notes=? WHERE carrier_id=?",(name,code.strip().upper(),aliases.strip(),int(enabled),notes.strip(),int(choice)))
         st.success("保存成功")
+        st.rerun()
+
+    st.divider()
+    st.subheader("删除船司")
+    if not options:
+        st.info("暂无可删除的船司")
+        return
+    delete_key=st.selectbox("选择要删除的船司",list(options),format_func=lambda k:f"{k} · {options[k]['carrier_name']}",key="delete_shipping_line")
+    with st.form("delete_shipping_line_form"):
+        confirmed=st.checkbox("我确认删除此船司主数据（不可撤销）")
+        delete=st.form_submit_button("删除",type="secondary")
+    if delete:
+        if not confirmed:
+            st.error("请先确认删除")
+            return
+        with db_connect(db) as conn:
+            linked=conn.execute("SELECT COUNT(*) AS n FROM gtms_shipping_line_sources WHERE carrier_id=?",(int(delete_key),)).fetchone()["n"]
+            if linked:
+                st.error(f"该船司存在 {linked} 条业务名称映射，请先调整映射，不能直接删除。")
+                return
+            conn.execute("DELETE FROM gtms_shipping_lines WHERE carrier_id=?",(int(delete_key),))
+        st.success("删除成功")
         st.rerun()
