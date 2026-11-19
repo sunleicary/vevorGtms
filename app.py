@@ -308,6 +308,43 @@ df = df.drop_duplicates(subset=["排柜单号"], keep="last").copy()
 df["区域"] = df["目的仓物流区域"].fillna("").map(region)
 for col in ["ETA日期", "ATA日期", "LFD", "进口实际提箱时间", "实际送仓时间", "实际还柜日期"]:
     df[col + "_dt"] = pd.to_datetime(df[col], errors="coerce", format="mixed")
+# Shared sidebar filters for operational reports. Always use post-port supplier field.
+# The date range is inclusive; missing/invalid ETA is excluded only when a range is enabled.
+with st.sidebar:
+    st.markdown("### 运营数据筛选")
+    region_options = sorted(df["区域"].dropna().unique().tolist())
+    selected_region = st.selectbox("运营区域", ["全部区域"] + region_options, key="gtms_filter_region")
+    supplier_options = sorted(
+        v for v in df["港后拖车行"].fillna("").astype(str).str.strip().unique()
+        if v and v.casefold() not in ("nan", "none", "null")
+    )
+    selected_supplier = st.selectbox("港后拖车商", ["全部拖车商"] + supplier_options, key="gtms_filter_supplier")
+    eta_values = df["ETA日期_dt"].dropna()
+    eta_enabled = st.checkbox("启用 ETA 范围筛选", value=False, key="gtms_filter_eta_enabled")
+    eta_range = None
+    if eta_enabled and not eta_values.empty:
+        eta_min, eta_max = eta_values.min().date(), eta_values.max().date()
+        eta_range = st.date_input("ETA范围（含起止日）", value=(eta_min, eta_max),
+                                  min_value=eta_min, max_value=eta_max, key="gtms_filter_eta_range")
+    elif eta_enabled:
+        st.warning("当前业务数据没有有效 ETA 日期。")
+if selected_region != "全部区域":
+    df = df[df["区域"].eq(selected_region)].copy()
+if selected_supplier != "全部拖车商":
+    df = df[df["港后拖车行"].fillna("").astype(str).str.strip().eq(selected_supplier)].copy()
+if eta_enabled:
+    if eta_range is not None and len(eta_range) == 2:
+        start_eta, end_eta = eta_range
+        df = df[df["ETA日期_dt"].dt.date.between(start_eta, end_eta)].copy()
+    elif eta_values.empty:
+        df = df.iloc[0:0].copy()
+    else:
+        st.info("请选择完整的 ETA 起止日期。")
+        st.stop()
+st.caption(f"当前运营筛选：{selected_region} · {selected_supplier} · "
+           + (f"ETA {eta_range[0]} 至 {eta_range[1]}" if eta_enabled and eta_range and len(eta_range)==2 else "ETA不限")
+           + f" · {len(df):,} 条业务记录")
+
 if page == "全球港后运营总览":
     show_global_overview(df)
     st.stop()
@@ -315,7 +352,7 @@ if page == "全球港后运营总览":
 # Existing US operations pages must not include newly imported non-US records.
 df = df[df["目的仓国家"].map(is_us_country)].copy()
 
-# Report on all US post-port records; no implicit sidebar filters.
+# Report on US post-port records with the explicit sidebar filters applied.
 q = df.copy()
 
 today = pd.Timestamp(date.today())
