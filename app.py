@@ -19,6 +19,7 @@ from database_backup import show_database_backup
 from database_status import show_database_status
 from drayage_suppliers import show_drayage_suppliers
 from country_regions import show_country_regions
+from global_ports_terminals import show_global_ports_terminals
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -83,7 +84,7 @@ with st.sidebar:
             "拖车行合同管理", "拖车行异常费用管理", "账期与费用结算管理",
         ],
         "企业主数据管理": [
-            "全球国家与业务区域管理", "全球港后港口与码头管理",
+            "全球国家与业务区域管理", "全球港口与码头管理",
             "船司管理", "清关行管理", "海外仓主数据管理", "拖车行主数据管理",
         ],
         "权限管理": ["角色管理", "用户管理"],
@@ -156,7 +157,7 @@ with st.sidebar:
 
 # Pages without a migrated backend are visible as planned modules, not fake data forms.
 planned_modules = {
-    "全球港后港口与码头管理": "待建设港口、码头及国家区域关联主数据。",
+
     "船司管理": "待建设船公司主数据与标准编码。",
     "清关行管理": "待建设清关服务商主数据。",
     "海外仓主数据管理": "待建设海外仓地址、区域及收货规则主数据。",
