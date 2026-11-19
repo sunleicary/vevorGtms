@@ -11,7 +11,6 @@ REGIONS = [
  ("US-ATL","亚特兰大","Atlanta","ATL"),
  ("US-CHI","芝加哥","Chicago","CHI"),
  ("US-SAV","萨凡纳","Savannah","SAV"),
- ("US-SEA","西雅图","Seattle","SEA"),
 ]
 COUNTRIES = [
  ("US","美国","United States",["美国","US","USA","AMERICA","UNITED STATES","UNITED STATES OF AMERICA"]),
@@ -46,7 +45,6 @@ def _region_code(value):
             "US-ATL":("亚特兰大","ATLANTA","ATL","佐治亚"),
             "US-CHI":("芝加哥","CHICAGO","CHI","伊利诺伊"),
             "US-SAV":("萨凡纳","SAVANNAH","SAV"),
-            "US-SEA":("西雅图","SEATTLE","美北WA-西雅图"),
         }[code]
         if s in {_normalize(cn),_normalize(en),_normalize(abbr)} or any(k in s for k in keys):
             return code
@@ -82,6 +80,8 @@ def _initialize(conn):
             (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
             VALUES (?,?,?,?,?,?,99) ON CONFLICT(region_code) DO NOTHING""",
             (code,country,country_name,cn,en,abbr))
+    # Remove obsolete Seattle master record after consolidating it into LA/LB.
+    conn.execute("DELETE FROM gtms_operating_regions WHERE region_code=?", ("US-SEA",))
     for i,(code,cn,en,abbr) in enumerate(REGIONS,1):
         conn.execute("""INSERT INTO gtms_operating_regions
             (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
@@ -113,10 +113,19 @@ def _sync_existing(conn):
         raw_region=str(row["region_raw"] or "").strip()
         country=aliases.get(_normalize(raw_country))
         region=_region_code(raw_region) if country=="US" else None
+        if country=="US" and ("西雅图" in raw_region or "SEATTLE" in _normalize(raw_region)):
+            region="US-LALB"
         if country=="CZ" and raw_region=="欧洲-捷克":
             region="CZ-01"
         if country=="CN" and raw_region=="中国-华东":
             region="CN-EAST"
+        # Fallback only when the source region is missing or explicitly unclassified.
+        # Do not mask country/region conflicts (e.g. Czech country with Spain region).
+        if country and not region and (
+            not raw_region or _normalize(raw_region) in
+            {"其他", "OTHER", "UNKNOWN", "未记录区域", "美国-其他", "美国-TIKTOK抖音官方仓"}
+        ):
+            region=country
         conn.execute("""INSERT INTO gtms_region_source_values
             (country_raw,region_raw,country_code,region_code,record_count)
             VALUES (?,?,?,?,?)""",(raw_country,raw_region,country,region,int(row["cnt"])))
