@@ -54,6 +54,9 @@ def _initialize(conn):
         country_name_en TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1)""")
     conn.execute("""CREATE TABLE IF NOT EXISTS gtms_country_aliases (
         alias TEXT PRIMARY KEY, country_code TEXT NOT NULL)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS gtms_country_candidates (
+        country_raw TEXT PRIMARY KEY, record_count INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT '待确认')""")
     conn.execute("""CREATE TABLE IF NOT EXISTS gtms_region_source_values (
         country_raw TEXT NOT NULL, region_raw TEXT NOT NULL,
         country_code TEXT, region_code TEXT, record_count INTEGER NOT NULL,
@@ -84,6 +87,15 @@ def _sync_existing(conn):
         raise
     aliases={r["alias"]:r["country_code"] for r in conn.execute("SELECT alias,country_code FROM gtms_country_aliases").fetchall()}
     conn.execute("DELETE FROM gtms_region_source_values")
+    counts={}
+    for row in source:
+        raw=str(row["country_raw"] or "").strip()
+        if raw and _normalize(raw) not in aliases:
+            counts[raw]=counts.get(raw,0)+int(row["cnt"])
+    conn.execute("DELETE FROM gtms_country_candidates")
+    for raw,total in counts.items():
+        conn.execute("INSERT INTO gtms_country_candidates (country_raw,record_count,status) VALUES (?,?,?)",
+                     (raw,total,"待确认"))
     for row in source:
         raw_country=str(row["country_raw"] or "").strip()
         raw_region=str(row["region_raw"] or "").strip()
@@ -108,11 +120,31 @@ def show_country_regions(user, db):
             region_name_en,abbreviation,sort_order,enabled FROM gtms_operating_regions
             ORDER BY country_code,sort_order,region_code""").fetchall()
         countries=conn.execute("SELECT * FROM gtms_countries ORDER BY country_code").fetchall()
+        candidates=conn.execute("SELECT * FROM gtms_country_candidates ORDER BY record_count DESC").fetchall()
         source=conn.execute("SELECT * FROM gtms_region_source_values ORDER BY record_count DESC").fetchall()
     records=[dict(r) for r in rows]
     st.caption("主数据与原始业务数据分开存储；国家采用 ISO 两位编码，美国区域采用 US- 前缀。")
     st.subheader("国家主数据")
     st.dataframe(pd.DataFrame([dict(x) for x in countries]),hide_index=True,use_container_width=True)
+    st.subheader("现有数据中未识别的国家名称")
+    pending=[dict(x) for x in candidates]
+    if pending:
+        st.warning(f"发现 {len(pending)} 个未识别的原始国家名称，已完整保存，等待管理员确认国家编码。")
+        st.dataframe(pd.DataFrame(pending),hide_index=True,use_container_width=True)
+        if is_admin(user):
+            with st.form("resolve_country"):
+                raw=st.selectbox("选择原始国家名称", [r["country_raw"] for r in pending])
+                target=st.selectbox("映射到标准国家", [r["country_code"]+" · "+r["country_name"] for r in countries])
+                resolve=st.form_submit_button("确认国家映射并重新同步")
+            if resolve:
+                code=target.split(" · ",1)[0]
+                with db_connect(db) as conn:
+                    conn.execute("INSERT INTO gtms_country_aliases(alias,country_code) VALUES (?,?) ON CONFLICT(alias) DO UPDATE SET country_code=excluded.country_code",(_normalize(raw),code))
+                    _sync_existing(conn)
+                st.success("国家映射已保存。")
+                st.rerun()
+    else:
+        st.success("当前已同步的国家名称均能匹配标准国家主数据。")
     st.subheader("现有业务国家与区域映射")
     source_records=[dict(x) for x in source]
     if source_records:
