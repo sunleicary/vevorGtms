@@ -18,6 +18,7 @@ from auth import login_gate, manage_users, change_own_password, manage_roles, pe
 from database_backup import show_database_backup
 from database_status import show_database_status
 from drayage_suppliers import show_drayage_suppliers
+from country_regions import show_country_regions
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -155,7 +156,6 @@ with st.sidebar:
 
 # Pages without a migrated backend are visible as planned modules, not fake data forms.
 planned_modules = {
-    "全球国家与业务区域管理": "待建设国家、区域和业务覆盖范围主数据。",
     "全球港后港口与码头管理": "待建设港口、码头及国家区域关联主数据。",
     "船司管理": "待建设船公司主数据与标准编码。",
     "清关行管理": "待建设清关服务商主数据。",
@@ -165,6 +165,10 @@ planned_modules = {
 }
 if module not in allowed_modules:
     st.error("当前账号无权访问此模块。")
+    st.stop()
+
+if page == "全球国家与业务区域管理":
+    show_country_regions(user, DB)
     st.stop()
 
 if page == "角色管理":
