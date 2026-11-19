@@ -311,19 +311,7 @@ elif page == "运营总览":
         with tab:
             z = q if name is None else q[q["区域"] == name]
             st.subheader(name or "美国港后运营总览")
-            if len(eta_range) == 2:
-                st.markdown(
-                    f'<div style="display:inline-flex;align-items:center;gap:9px;'
-                    f'background:#e8f2ff;border:1px solid #bdd5fa;border-left:4px solid #ff5a19;'
-                    f'border-radius:8px;padding:7px 13px;margin:0 0 12px 0;'
-                    f'color:#09275d;font-weight:700;font-size:.91rem">'
-                    f'📅 ETA 统计窗口：{eta_range[0]:%Y/%m/%d} — {eta_range[1]:%Y/%m/%d}'
-                    f' <span style="font-weight:400;color:#4b6a9b">｜按预计到港日期统计 · 随左侧筛选同步更新</span>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.caption("ETA 统计窗口：请选择完整的开始和结束日期")
+            st.caption("统计范围：全部美国港后业务记录（不限制 ETA 日期）")
             arrived = z["ATA日期_dt"].notna()
             picked = z["进口实际提箱时间_dt"].notna()
             delivered = z["实际送仓时间_dt"].notna()
@@ -417,8 +405,6 @@ elif page == "运营总览":
                             details = details.sort_values("LFD_dt", na_position="last")
                             st.caption(f"符合条件 {len(details):,} 柜")
                             grid(details, key=f"overview_vendor_lfd_detail_{i}")
-                    if carrier != "全部":
-                        st.caption("左侧已筛选单个港后拖车商；切换为「全部」可比较该区域所有供应商。")
 
             st.markdown("### 📊 区域业务与拖车商分配")
             chart_left, chart_right = st.columns([1, 1], gap="large")
@@ -487,8 +473,6 @@ elif page == "运营总览":
                             "view": {"stroke": None},
                         }, use_container_width=True, key=f"overview_supplier_share_{i}")
                         st.caption("色块显示柜量与占比；占比不足13%的色块请悬停查看，避免标签重叠。")
-                        if carrier != "全部":
-                            st.caption("当前已筛选单个拖车商；选择左侧「全部」查看完整供应商占比。")
             if not z.empty:
                 with st.expander("🔎 区域柜量及港后拖车商占比 · 条件查询", expanded=True):
                     st.caption("在当前 ETA、区域和拖车商全局筛选范围内进一步查询；占比以所选区域的全部货柜为分母。")
