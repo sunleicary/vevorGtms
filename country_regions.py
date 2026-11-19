@@ -114,20 +114,6 @@ def _initialize(conn):
             if conn.execute("SELECT 1 FROM gtms_countries WHERE country_code=?",(row["country_code"],)).fetchone():
                 _add_alias(conn,row["country_code"],row["alias"])
         conn.execute("DROP TABLE gtms_country_aliases")
-    # Every country has a country-level default operating region.
-    # Region code equals the ISO country code; dedicated subregions remain separate.
-    for code,cn,en,_ in COUNTRIES:
-        conn.execute("""INSERT INTO gtms_operating_regions
-            (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
-            VALUES (?,?,?,?,?,?,?) ON CONFLICT(region_code) DO NOTHING""",
-            (code,code,cn,cn,en,code,0))
-    # Include countries created manually after initial seed.
-    for row in conn.execute("SELECT country_code,country_name,country_name_en FROM gtms_countries").fetchall():
-        code=row["country_code"]
-        conn.execute("""INSERT INTO gtms_operating_regions
-            (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
-            VALUES (?,?,?,?,?,?,?) ON CONFLICT(region_code) DO NOTHING""",
-            (code,code,row["country_name"],row["country_name"],row["country_name_en"],code,0))
     for code,country,country_name,cn,en,abbr in [
         ("CZ-01","CZ","捷克","捷克","Czech Republic","CZ"),
         ("CN-EAST","CN","中国","华东","East China","EAST"),
@@ -142,6 +128,22 @@ def _initialize(conn):
         conn.execute("""INSERT INTO gtms_operating_regions
             (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
             VALUES (?,?,?,?,?,?,?) ON CONFLICT(region_code) DO NOTHING""",(code,"US","美国",cn,en,abbr,i))
+
+    # A country-level default region is allowed only if no subregion exists.
+    # Remove obsolete defaults when explicit regions exist (notably US).
+    for row in conn.execute("SELECT country_code,country_name,country_name_en FROM gtms_countries").fetchall():
+        code=row["country_code"]
+        has_subregion=conn.execute(
+            "SELECT 1 FROM gtms_operating_regions WHERE country_code=? AND region_code<>? LIMIT 1",
+            (code,code)).fetchone()
+        if has_subregion:
+            conn.execute("DELETE FROM gtms_operating_regions WHERE region_code=? AND country_code=?",
+                         (code,code))
+        else:
+            conn.execute("""INSERT INTO gtms_operating_regions
+                (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
+                VALUES (?,?,?,?,?,?,?) ON CONFLICT(region_code) DO NOTHING""",
+                (code,code,row["country_name"],row["country_name"],row["country_name_en"],code,0))
 
 def _sync_existing(conn):
     # Read existing source values; do not rewrite the container business table.
@@ -181,7 +183,11 @@ def _sync_existing(conn):
             not raw_region or _normalize(raw_region) in
             {"其他", "OTHER", "UNKNOWN", "未记录区域", "美国-其他", "美国-TIKTOK抖音官方仓"}
         ):
-            region=country
+            default_exists=conn.execute(
+                "SELECT 1 FROM gtms_operating_regions WHERE country_code=? AND region_code=?",
+                (country,country)).fetchone()
+            if default_exists:
+                region=country
         conn.execute("""INSERT INTO gtms_region_source_values
             (country_raw,region_raw,country_code,region_code,record_count)
             VALUES (?,?,?,?,?)""",(raw_country,raw_region,country,region,int(row["cnt"])))
@@ -231,9 +237,9 @@ def show_country_regions(user, db):
     if source_records:
         st.metric("已同步原始国家/区域组合",len(source_records))
         st.dataframe(pd.DataFrame(source_records),hide_index=True,use_container_width=True)
-        missing=[x for x in source_records if not x["country_code"] or (x["country_code"]=="US" and not x["region_code"])]
+        missing=[x for x in source_records if not x["country_code"] or not x["region_code"]]
         if missing:
-            st.warning(f"有 {len(missing)} 组国家或美国区域尚未识别，请核对源数据。")
+            st.warning(f"有 {len(missing)} 组国家或业务区域尚未识别，请核对源数据。")
         st.download_button("导出原始国家区域映射",pd.DataFrame(source_records).to_csv(index=False).encode("utf-8-sig"),file_name="gtms_country_region_mapping.csv",mime="text/csv")
     else:
         st.info("尚未同步现有货柜业务的国家与区域，请点击上方同步按钮。")
