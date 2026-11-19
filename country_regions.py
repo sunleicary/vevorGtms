@@ -11,6 +11,7 @@ REGIONS = [
  ("US-ATL","亚特兰大","Atlanta","ATL"),
  ("US-CHI","芝加哥","Chicago","CHI"),
  ("US-SAV","萨凡纳","Savannah","SAV"),
+ ("US-SEA","西雅图","Seattle","SEA"),
 ]
 COUNTRIES = [
  ("US","美国","United States",["美国","US","USA","AMERICA","UNITED STATES","UNITED STATES OF AMERICA"]),
@@ -30,6 +31,8 @@ COUNTRIES = [
  ("MY","马来西亚","Malaysia",["马来西亚","MY","MALAYSIA"]),
  ("TH","泰国","Thailand",["泰国","TH","THAILAND"]),
  ("AE","阿联酋","United Arab Emirates",["阿联酋","AE","UAE","UNITED ARAB EMIRATES"]),
+ ("CZ","捷克","Czech Republic",["捷克","CZ","CZECH REPUBLIC","CZECHIA"]),
+ ("CN","中国","China",["中国","CN","CHINA","PRC"]),
 ]
 def _normalize(value):
     return str(value or "").strip().upper()
@@ -43,6 +46,7 @@ def _region_code(value):
             "US-ATL":("亚特兰大","ATLANTA","ATL","佐治亚"),
             "US-CHI":("芝加哥","CHICAGO","CHI","伊利诺伊"),
             "US-SAV":("萨凡纳","SAVANNAH","SAV"),
+            "US-SEA":("西雅图","SEATTLE","美北WA-西雅图"),
         }[code]
         if s in {_normalize(cn),_normalize(en),_normalize(abbr)} or any(k in s for k in keys):
             return code
@@ -70,6 +74,14 @@ def _initialize(conn):
         conn.execute("INSERT INTO gtms_countries(country_code,country_name,country_name_en) VALUES (?,?,?) ON CONFLICT(country_code) DO NOTHING",(code,cn,en))
         for alias in aliases:
             conn.execute("INSERT INTO gtms_country_aliases(alias,country_code) VALUES (?,?) ON CONFLICT(alias) DO NOTHING",(_normalize(alias),code))
+    for code,country,country_name,cn,en,abbr in [
+        ("CZ-01","CZ","捷克","捷克","Czech Republic","CZ"),
+        ("CN-EAST","CN","中国","华东","East China","EAST"),
+    ]:
+        conn.execute("""INSERT INTO gtms_operating_regions
+            (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
+            VALUES (?,?,?,?,?,?,99) ON CONFLICT(region_code) DO NOTHING""",
+            (code,country,country_name,cn,en,abbr))
     for i,(code,cn,en,abbr) in enumerate(REGIONS,1):
         conn.execute("""INSERT INTO gtms_operating_regions
             (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
@@ -101,6 +113,10 @@ def _sync_existing(conn):
         raw_region=str(row["region_raw"] or "").strip()
         country=aliases.get(_normalize(raw_country))
         region=_region_code(raw_region) if country=="US" else None
+        if country=="CZ" and raw_region=="欧洲-捷克":
+            region="CZ-01"
+        if country=="CN" and raw_region=="中国-华东":
+            region="CN-EAST"
         conn.execute("""INSERT INTO gtms_region_source_values
             (country_raw,region_raw,country_code,region_code,record_count)
             VALUES (?,?,?,?,?)""",(raw_country,raw_region,country,region,int(row["cnt"])))
