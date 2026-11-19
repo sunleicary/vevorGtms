@@ -44,11 +44,12 @@ def ensure_roles():
             role TEXT PRIMARY KEY, description TEXT NOT NULL DEFAULT ''
         )""")
         for role in ROLES:
-            conn.execute("INSERT INTO gtms_roles (role, description) VALUES (?, ?) ON CONFLICT (role) DO NOTHING", (role, "系统预设角色"))
-            existing = conn.execute("SELECT COUNT(*) FROM gtms_role_permissions WHERE role=?", (role,)).fetchone()[0]
-            if not existing:
-                for module in DEFAULT_PERMISSIONS[role]:
-                    conn.execute("INSERT INTO gtms_role_permissions (role, module) VALUES (?, ?) ON CONFLICT (role, module) DO NOTHING", (role, module))
+            exists = conn.execute("SELECT 1 FROM gtms_roles WHERE role=?", (role,)).fetchone()
+            if exists:
+                continue
+            conn.execute("INSERT INTO gtms_roles (role, description) VALUES (?, ?)", (role, "系统预设角色"))
+            for module in DEFAULT_PERMISSIONS[role]:
+                conn.execute("INSERT INTO gtms_role_permissions (role, module) VALUES (?, ?) ON CONFLICT (role, module) DO NOTHING", (role, module))
         # Convert legacy roles without losing existing user accounts or password hashes.
         for old, new in LEGACY_ROLES.items():
             conn.execute("UPDATE users SET role=? WHERE role=?", (new, old))
