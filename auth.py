@@ -6,7 +6,6 @@ import secrets
 import sqlite3
 from db_backend import connect as db_connect, is_neon
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
 
 import psycopg
 
@@ -86,24 +85,7 @@ def current_user():
     return {"username": row["username"], "role": row["role"]}
 
 
-def _local_demo_enabled():
-    """Opt-in demo login, strictly limited to a loopback browser and SQLite."""
-    if os.environ.get("GTMS_LOCAL_AUTO_LOGIN", "").strip() != "1":
-        return False
-    if is_neon():
-        return False
-    try:
-        host = (urlsplit(st.context.url).hostname or "").lower()
-    except (AttributeError, ValueError):
-        return False
-    return host in {"localhost", "127.0.0.1", "::1"}
-
-
 def login_gate():
-    if _local_demo_enabled():
-        st.session_state["gtms_local_demo"] = True
-        return {"username": "admin", "role": "管理员"}
-    st.session_state.pop("gtms_local_demo", None)
     if not bootstrap():
         st.error("尚未初始化管理员。请在 Streamlit Cloud → App settings → Secrets 配置长度至少 12 位的 ADMIN_PASSWORD。")
         st.stop()
