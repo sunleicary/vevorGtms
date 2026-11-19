@@ -63,9 +63,9 @@ def infer_port_countries(conn, cols, port_fields):
     aliases=_alias_index(conn)
     assigned=0
     conflicts=0
+    observations={}
     for field in port_fields:
         query='SELECT "'+field+'" AS port_raw,"目的仓国家" AS country_raw,COUNT(*) AS cnt FROM containers GROUP BY "'+field+'","目的仓国家"'
-        observations={}
         for row in conn.execute(query).fetchall():
             name=clean(row["port_raw"])
             if not name:
@@ -73,14 +73,14 @@ def infer_port_countries(conn, cols, port_fields):
             code=aliases.get(str(row["country_raw"] or "").strip().upper())
             if code:
                 observations.setdefault(uid("port",name),set()).add(code)
-        for pid,codes in observations.items():
-            if len(codes)!=1:
-                conflicts+=1
-                continue
-            code=next(iter(codes))
-            # Do not overwrite an existing manually curated country.
-            result=conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=? AND (country_code='' OR country_code IS NULL)",(code,pid))
-            assigned+=max(0,result.rowcount)
+    for pid,codes in observations.items():
+        if len(codes)!=1:
+            conflicts+=1
+            continue
+        code=next(iter(codes))
+        # Do not overwrite an existing manually curated country.
+        result=conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=? AND (country_code='' OR country_code IS NULL)",(code,pid))
+        assigned+=max(0,result.rowcount)
     return assigned,conflicts
 
 def sync(conn):
