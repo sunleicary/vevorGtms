@@ -201,73 +201,88 @@ def sync(conn):
 
 def show_global_ports_terminals(user, db):
     st.title("全球港口与码头管理")
-    st.caption("港前港后共用主数据；仅依据实际存在的业务字段初始化。卸货港国家以业务表的目的仓国家为准；港前起运港按港口名称识别；来源冲突保留待核对。")
+    st.caption("整数主键版本：港口、码头分别使用 BIGINT；旧字符型主数据只读保留，避免破坏既有业务关联。")
     with db_connect(db) as conn:
-        initialize(conn)
-        try:
-            counts=sync(conn)
-        except Exception as exc:
-            st.error("业务港口与码头同步失败，请检查数据库字段。")
-            st.caption(type(exc).__name__)
+        if is_neon():
+            exists=conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name IN ('gtms_ports_v2','gtms_terminals_v2')").fetchall()
+            available={r["table_name"] for r in exists}
+        else:
+            available={r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('gtms_ports_v2','gtms_terminals_v2')").fetchall()}
+        if len(available)!=2:
+            st.warning("尚未初始化整数主键数据库。请先在 Neon SQL Editor 执行 gtms_integer_ids_neon_seed.sql；不会覆盖旧表。")
             return
-        ports=[dict(x) for x in conn.execute("SELECT * FROM gtms_global_ports ORDER BY port_name").fetchall()]
-        terminals=[dict(x) for x in conn.execute("SELECT * FROM gtms_global_terminals ORDER BY terminal_name").fetchall()]
-        sources=[dict(x) for x in conn.execute("SELECT * FROM gtms_port_terminal_sources ORDER BY entity_type,business_side,source_field").fetchall()]
-    a,b,c=st.columns(3)
-    a.metric("港口",len(ports))
-    b.metric("码头",len(terminals))
-    c.metric("本次发现的港口/码头",str(counts[0])+" / "+str(counts[1]))
-    st.caption(f"国家代码更新 {counts[2]} 条；来源国家冲突 {counts[3]} 条；仍未识别 {counts[4]} 条。卸货港按目的仓国家确定，港前起运港按名称识别。")
-    st.caption("同步只补充缺失的主数据并刷新来源计数，不覆盖人工编辑字段。")
-    tab1,tab2,tab3=st.tabs(["港口主数据","码头主数据","业务来源与统计"])
-    with tab1:
+        ports=[dict(r) for r in conn.execute("SELECT * FROM gtms_ports_v2 ORDER BY port_id").fetchall()]
+        terminals=[dict(r) for r in conn.execute("SELECT * FROM gtms_terminals_v2 ORDER BY terminal_id").fetchall()]
+    c1,c2,c3=st.columns(3)
+    c1.metric("港口记录",len(ports))
+    c2.metric("码头记录",len(terminals))
+    c3.metric("标准港口",len({p["canonical_port_id"] for p in ports}))
+    ptab,ttab,stab=st.tabs(["港口主数据","码头主数据","数据完整性"])
+    with ptab:
         st.dataframe(pd.DataFrame(ports),hide_index=True,use_container_width=True)
         if ports:
-            st.download_button("导出港口 CSV",pd.DataFrame(ports).to_csv(index=False).encode("utf-8-sig"),file_name="gtms_ports.csv",mime="text/csv")
-    with tab2:
-        st.dataframe(pd.DataFrame(terminals),hide_index=True,use_container_width=True)
+            st.download_button("导出港口CSV",pd.DataFrame(ports).to_csv(index=False).encode("utf-8-sig"),"gtms_ports_v2.csv","text/csv")
+    with ttab:
+        port_names={p["port_id"]:p["port_name"] for p in ports}
+        display=[{**t,"所属港口":port_names.get(t["port_id"],"未找到")} for t in terminals]
+        st.dataframe(pd.DataFrame(display),hide_index=True,use_container_width=True)
         if terminals:
-            st.download_button("导出码头 CSV",pd.DataFrame(terminals).to_csv(index=False).encode("utf-8-sig"),file_name="gtms_terminals.csv",mime="text/csv")
-    with tab3:
-        st.dataframe(pd.DataFrame(sources),hide_index=True,use_container_width=True)
-        st.info("来源字段不等同于实际业务环节。共享字段标为“未区分”，不根据拖车供应商名称推断港前/港后。")
+            st.download_button("导出码头CSV",pd.DataFrame(terminals).to_csv(index=False).encode("utf-8-sig"),"gtms_terminals_v2.csv","text/csv")
+    with stab:
+        orphans=[t for t in terminals if t["port_id"] not in {p["port_id"] for p in ports}]
+        pending=[t for t in terminals if t["verification_status"] not in ("official_source_reviewed","verified")]
+        st.write(f"码头关联异常：{len(orphans)}；待进一步核验：{len(pending)}")
+        if pending:
+            st.dataframe(pd.DataFrame(pending),hide_index=True,use_container_width=True)
     if not is_admin(user):
         return
-    st.subheader("主数据维护")
-    entity=st.radio("维护对象",["港口","码头"],horizontal=True)
-    records=ports if entity=="港口" else terminals
-    options={r["port_id"] if entity=="港口" else r["terminal_id"]:r for r in records}
-    selected=st.selectbox("选择记录",["新增"]+list(options),format_func=lambda x:"新增" if x=="新增" else (options[x]["port_name"] if entity=="港口" else options[x]["terminal_name"])+" · "+x[:8])
-    old=options.get(selected,{})
-    with st.form("port_terminal_editor"):
-        name=st.text_input("名称",old.get("port_name",old.get("terminal_name","")))
-        if entity=="港口":
-            country=st.text_input("国家 ISO 两位编码（待确认可留空）",old.get("country_code",""))
-            unlocode=st.text_input("UN/LOCODE（待确认可留空）",old.get("unlocode",""))
+    st.subheader("主数据维护（整数 ID）")
+    kind=st.radio("对象",["港口","码头"],horizontal=True)
+    records=ports if kind=="港口" else terminals
+    id_field="port_id" if kind=="港口" else "terminal_id"
+    choices={str(r[id_field]):r for r in records}
+    selection=st.selectbox("选择记录",["新增"]+list(choices),format_func=lambda x:"新增" if x=="新增" else f"{x} · {choices[x]['port_name' if kind=='港口' else 'terminal_name']}")
+    current=choices.get(selection,{})
+    with st.form("v2_master_edit"):
+        name=st.text_input("名称",current.get("port_name",current.get("terminal_name","")))
+        if kind=="港口":
+            country=st.text_input("国家代码",current.get("country_code",""))
+            locode=st.text_input("UN/LOCODE",current.get("unlocode",""))
+            classification=st.text_input("分类",current.get("classification","seaport_or_port_city"))
         else:
-            port_options={"":"待确认/未关联"}|{p["port_id"]:p["port_name"] for p in ports}
-            port_id=st.selectbox("所属港口",list(port_options),index=list(port_options).index(old.get("port_id","")) if old.get("port_id","") in port_options else 0,format_func=lambda x:port_options[x])
-        notes=st.text_area("备注",value=old.get("notes",""))
-        enabled=st.checkbox("启用",value=bool(old.get("enabled",1)))
-        save=st.form_submit_button("保存")
-    if save:
+            port_options={p["port_id"]:p["port_name"] for p in ports}
+            if not port_options:
+                st.warning("请先建立港口")
+                return
+            keys=list(port_options)
+            selected_port=st.selectbox("所属港口",keys,index=keys.index(current["port_id"]) if current.get("port_id") in keys else 0,format_func=lambda x:f"{x} · {port_options[x]}")
+            operator=st.text_input("运营商",current.get("operator_name",""))
+            terminal_type=st.text_input("码头类型",current.get("terminal_type","container"))
+            source_url=st.text_input("核验来源",current.get("source_url",""))
+            verification=st.selectbox("核验状态",["unverified","official_source_reviewed","verified"],index=["unverified","official_source_reviewed","verified"].index(current.get("verification_status","unverified")) if current.get("verification_status","unverified") in ["unverified","official_source_reviewed","verified"] else 0)
+        submitted=st.form_submit_button("保存")
+    if submitted:
         name=clean(name)
         if not name:
             st.error("名称不能为空")
             return
-        if entity=="港口" and (country.strip() and (len(country.strip())!=2 or not country.strip().isalpha())):
-            st.error("国家编码必须为两位字母")
+        if kind=="港口" and (len(country.strip())!=2 or not country.strip().isalpha()):
+            st.error("国家代码必须为两位英文字母")
             return
         with db_connect(db) as conn:
-            if entity=="港口":
-                if old:
-                    conn.execute("UPDATE gtms_global_ports SET port_name=?,country_code=?,unlocode=?,notes=?,enabled=? WHERE port_id=?",(name,country.strip().upper(),unlocode.strip().upper(),notes,int(enabled),selected))
-                else:
-                    conn.execute("INSERT INTO gtms_global_ports(port_id,port_name,country_code,unlocode,notes,enabled) VALUES (?,?,?,?,?,?) ON CONFLICT(port_id) DO NOTHING",(uid("port",name),name,country.strip().upper(),unlocode.strip().upper(),notes,int(enabled)))
+            if selection=="新增":
+                next_id=int(conn.execute(f"SELECT COALESCE(MAX({id_field}),0)+1 AS next_id FROM gtms_{'ports' if kind=='港口' else 'terminals'}_v2").fetchone()["next_id"])
             else:
-                if old:
-                    conn.execute("UPDATE gtms_global_terminals SET terminal_name=?,port_id=?,notes=?,enabled=? WHERE terminal_id=?",(name,port_id,notes,int(enabled),selected))
+                next_id=int(selection)
+            if kind=="港口":
+                if selection=="新增":
+                    conn.execute("INSERT INTO gtms_ports_v2(port_id,port_name,country_code,unlocode,canonical_port_id,classification,legacy_port_id) VALUES (?,?,?,?,?,?,?)",(next_id,name,country.upper().strip(),locode.upper().strip(),next_id,classification,"manual-"+str(next_id)))
                 else:
-                    conn.execute("INSERT INTO gtms_global_terminals(terminal_id,terminal_name,port_id,notes,enabled) VALUES (?,?,?,?,?) ON CONFLICT(terminal_id) DO NOTHING",(uid("terminal",name,port_id),name,port_id,notes,int(enabled)))
+                    conn.execute("UPDATE gtms_ports_v2 SET port_name=?,country_code=?,unlocode=?,classification=? WHERE port_id=?",(name,country.upper().strip(),locode.upper().strip(),classification,next_id))
+            else:
+                if selection=="新增":
+                    conn.execute("INSERT INTO gtms_terminals_v2(terminal_id,terminal_name,port_id,operator_name,terminal_type,source_url,verification_status,legacy_terminal_id) VALUES (?,?,?,?,?,?,?,?)",(next_id,name,selected_port,operator,terminal_type,source_url,verification,"manual-"+str(next_id)))
+                else:
+                    conn.execute("UPDATE gtms_terminals_v2 SET terminal_name=?,port_id=?,operator_name=?,terminal_type=?,source_url=?,verification_status=? WHERE terminal_id=?",(name,selected_port,operator,terminal_type,source_url,verification,next_id))
         st.success("保存成功")
         st.rerun()
