@@ -45,6 +45,88 @@ def show_do_assignment(user, db, containers):
     st.download_button("导出DO分配台账",filtered.to_csv(index=False).encode("utf-8-sig"),"postport_do_assignments.csv","text/csv")
     if not is_admin(user) and user.get("role")!="港后运营人员":
         return
+    st.subheader("批量DO分配")
+    st.caption("仅对未分配柜号建立DO；已分配、已确认、已取消的记录不会被批量覆盖。")
+    pending=view[view["DO状态"].eq("待分配")].copy()
+    if pending.empty:
+        st.info("当前筛选范围没有待分配货柜。")
+    else:
+        region_values=sorted(pending["目的仓物流区域"].fillna("").astype(str).unique().tolist())
+        selected_regions=st.multiselect("批量分配 · 运营区域",region_values,key="do_bulk_regions")
+        if selected_regions:
+            pending=pending[pending["目的仓物流区域"].fillna("").astype(str).isin(selected_regions)]
+        eta_dates=pd.to_datetime(pending["ETA日期"],errors="coerce",format="mixed")
+        valid_eta=eta_dates.dropna()
+        use_eta=st.checkbox("按ETA日期筛选",key="do_bulk_eta_enabled")
+        if use_eta and not valid_eta.empty:
+            start_date,end_date=valid_eta.min().date(),valid_eta.max().date()
+            chosen_dates=st.date_input("批量分配 · ETA范围",value=(start_date,end_date),
+                                       min_value=start_date,max_value=end_date,key="do_bulk_eta")
+            if len(chosen_dates)==2:
+                pending=pending[eta_dates.dt.date.between(*chosen_dates)]
+            else:
+                pending=pending.iloc[0:0]
+        elif use_eta:
+            st.warning("没有有效ETA日期。")
+            pending=pending.iloc[0:0]
+        bulk_query=st.text_input("批量分配 · 搜索柜号/排柜单号",key="do_bulk_search")
+        if bulk_query:
+            pending=pending[pending[["排柜单号","箱号"]].astype(str).apply(
+                lambda c:c.str.contains(bulk_query,case=False,regex=False)).any(axis=1)]
+        st.caption(f"可选择 {len(pending):,} 柜；勾选后先预览再确认。")
+        selection=pending.copy()
+        selection.insert(0,"选择",False)
+        edited=st.data_editor(selection,hide_index=True,use_container_width=True,
+                              disabled=[c for c in selection.columns if c!="选择"],
+                              key="do_bulk_editor")
+        chosen=edited[edited["选择"]].copy()
+        st.write(f"已选择 **{len(chosen):,}** 柜")
+        supplier_names=sorted(set(view["港后拖车行"].dropna().astype(str).str.strip())-{""})
+        with db_connect(db) as conn:
+            try:
+                master=conn.execute("SELECT supplier_name FROM gtms_drayage_suppliers WHERE stage='港后' AND status<>'停用'").fetchall()
+                supplier_names=sorted(set(supplier_names)|{r["supplier_name"] for r in master})
+            except Exception:
+                pass
+        with st.form("do_bulk_confirm"):
+            target_supplier=st.selectbox("批量分配给港后拖车商",["请选择"]+supplier_names)
+            bulk_notes=st.text_area("批量分配备注")
+            acknowledge=st.checkbox("已核对所选柜号与港后拖车商，确认批量创建DO分配")
+            preview=st.form_submit_button("预览批量分配")
+        if preview:
+            if not len(chosen) or target_supplier=="请选择" or not acknowledge:
+                st.error("请先选择货柜、指定供应商并确认。")
+            else:
+                st.session_state["do_bulk_preview"]={
+                    "orders":chosen["排柜单号"].tolist(),
+                    "supplier":target_supplier,"notes":bulk_notes,
+                }
+        prepared=st.session_state.get("do_bulk_preview")
+        if prepared:
+            ids=set(chosen["排柜单号"])
+            if (set(prepared["orders"])!=ids or prepared["supplier"]!=target_supplier
+                    or prepared["notes"]!=bulk_notes):
+                st.session_state.pop("do_bulk_preview",None)
+            else:
+                st.warning(f"即将为 {len(ids)} 柜分配给「{target_supplier}」，状态为「已分配待确认」。")
+                if st.button("最终确认并保存批量DO",type="primary",key="do_bulk_commit"):
+                    now=datetime.now(timezone.utc).isoformat()
+                    rows=chosen[["排柜单号","箱号"]].to_dict("records")
+                    saved=0
+                    with db_connect(db) as conn:
+                        for item in rows:
+                            # No upsert: never overwrite existing assignments, even if changed by another user.
+                            result=conn.execute("""INSERT INTO gtms_postport_do_assignments
+                                (order_no,container_no,supplier_name,status,assigned_at,assigned_by,confirmed_at,notes)
+                                VALUES (?,?,?,'已分配待确认',?,?,'',?)
+                                ON CONFLICT(order_no) DO NOTHING""",
+                                (item["排柜单号"],str(item["箱号"]),target_supplier,now,
+                                 user.get("username",""),bulk_notes.strip()))
+                            saved+=max(0,result.rowcount)
+                    st.session_state.pop("do_bulk_preview",None)
+                    st.success(f"成功创建 {saved} 条DO分配；{len(rows)-saved} 条已有记录未覆盖。")
+                    st.rerun()
+    st.divider()
     st.subheader("新增 / 修改 DO分配")
     if view.empty:return
     order=st.selectbox("选择排柜单号",view["排柜单号"].tolist())
