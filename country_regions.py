@@ -89,9 +89,8 @@ def _initialize(conn):
             "SELECT column_name FROM information_schema.columns WHERE table_name='gtms_countries'").fetchall()]
     if "aliases" not in columns:
         conn.execute("ALTER TABLE gtms_countries ADD COLUMN aliases TEXT NOT NULL DEFAULT '[]'")
-    conn.execute("""CREATE TABLE IF NOT EXISTS gtms_country_candidates (
-        country_raw TEXT PRIMARY KEY, record_count INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT '待确认')""")
+    # Legacy candidates are computed live from containers; no persisted table.
+    conn.execute("DROP TABLE IF EXISTS gtms_country_candidates")
     conn.execute("""CREATE TABLE IF NOT EXISTS gtms_region_source_values (
         country_raw TEXT NOT NULL, region_raw TEXT NOT NULL,
         country_code TEXT, region_code TEXT, record_count INTEGER NOT NULL,
@@ -157,15 +156,6 @@ def _sync_existing(conn):
         raise
     aliases=_alias_index(conn)
     conn.execute("DELETE FROM gtms_region_source_values")
-    counts={}
-    for row in source:
-        raw=str(row["country_raw"] or "").strip()
-        if raw and _normalize(raw) not in aliases:
-            counts[raw]=counts.get(raw,0)+int(row["cnt"])
-    conn.execute("DELETE FROM gtms_country_candidates")
-    for raw,total in counts.items():
-        conn.execute("INSERT INTO gtms_country_candidates (country_raw,record_count,status) VALUES (?,?,?)",
-                     (raw,total,"待确认"))
     for row in source:
         raw_country=str(row["country_raw"] or "").strip()
         raw_region=str(row["region_raw"] or "").strip()
@@ -207,16 +197,25 @@ def show_country_regions(user, db):
             region_name_en,abbreviation,sort_order,enabled FROM gtms_operating_regions
             ORDER BY country_code,sort_order,region_code""").fetchall()
         countries=conn.execute("SELECT * FROM gtms_countries ORDER BY country_code").fetchall()
-        candidates=conn.execute("SELECT * FROM gtms_country_candidates ORDER BY record_count DESC").fetchall()
         source=conn.execute("SELECT * FROM gtms_region_source_values ORDER BY record_count DESC").fetchall()
     records=[dict(r) for r in rows]
     st.caption("主数据与原始业务数据分开存储；国家采用 ISO 两位编码，美国区域采用 US- 前缀。")
     st.subheader("国家主数据")
     st.dataframe(pd.DataFrame([{**dict(x),"aliases":"、".join(_aliases(x))} for x in countries]),hide_index=True,use_container_width=True)
     st.subheader("现有数据中未识别的国家名称")
-    pending=[dict(x) for x in candidates]
+    alias_lookup={}
+    for item in countries:
+        for name in [item["country_code"],item["country_name"],item["country_name_en"]]+_aliases(item):
+            alias_lookup[_normalize(name)]=item["country_code"]
+    candidate_counts={}
+    for item in source:
+        raw=str(item["country_raw"] or "").strip()
+        if raw and _normalize(raw) not in alias_lookup:
+            candidate_counts[raw]=candidate_counts.get(raw,0)+int(item["record_count"])
+    pending=[{"country_raw":raw,"record_count":count,"status":"待确认"}
+             for raw,count in sorted(candidate_counts.items(),key=lambda pair:-pair[1])]
     if pending:
-        st.warning(f"发现 {len(pending)} 个未识别的原始国家名称，已完整保存，等待管理员确认国家编码。")
+        st.warning(f"发现 {len(pending)} 个未识别的原始国家名称，已实时识别，等待管理员确认国家编码。")
         st.dataframe(pd.DataFrame(pending),hide_index=True,use_container_width=True)
         if is_admin(user):
             with st.form("resolve_country"):
