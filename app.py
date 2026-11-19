@@ -24,6 +24,7 @@ from shipping_lines import show_shipping_lines
 from customs_brokers import show_customs_brokers
 from warehouses import show_warehouses
 from drayage_master import show_drayage_master
+from postport_do_assignment import show_do_assignment
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -81,7 +82,7 @@ with st.sidebar:
     # Five business domains; labels are kept separate from legacy handlers.
     navigation = {
         "港后运营管理": [
-            "港后运营工作台", "港后LFD智能预警管理",
+            "港后运营工作台", "港后拖车商DO分配", "港后LFD智能预警管理",
             "港后供应商产能与计划管理", "港后供应商绩效KPI管理",
         ],
         "港后拖车行结算管理": [
@@ -344,6 +345,10 @@ if eta_enabled:
 st.caption(f"当前运营筛选：{selected_region} · {selected_supplier} · "
            + (f"ETA {eta_range[0]} 至 {eta_range[1]}" if eta_enabled and eta_range and len(eta_range)==2 else "ETA不限")
            + f" · {len(df):,} 条业务记录")
+
+if page == "港后拖车商DO分配":
+    show_do_assignment(user, DB, df)
+    st.stop()
 
 if page == "全球港后运营总览":
     show_global_overview(df)
