@@ -114,6 +114,20 @@ def _initialize(conn):
             if conn.execute("SELECT 1 FROM gtms_countries WHERE country_code=?",(row["country_code"],)).fetchone():
                 _add_alias(conn,row["country_code"],row["alias"])
         conn.execute("DROP TABLE gtms_country_aliases")
+    # Every country has a country-level default operating region.
+    # Region code equals the ISO country code; dedicated subregions remain separate.
+    for code,cn,en,_ in COUNTRIES:
+        conn.execute("""INSERT INTO gtms_operating_regions
+            (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
+            VALUES (?,?,?,?,?,?,?) ON CONFLICT(region_code) DO NOTHING""",
+            (code,code,cn,cn,en,code,0))
+    # Include countries created manually after initial seed.
+    for row in conn.execute("SELECT country_code,country_name,country_name_en FROM gtms_countries").fetchall():
+        code=row["country_code"]
+        conn.execute("""INSERT INTO gtms_operating_regions
+            (region_code,country_code,country_name,region_name,region_name_en,abbreviation,sort_order)
+            VALUES (?,?,?,?,?,?,?) ON CONFLICT(region_code) DO NOTHING""",
+            (code,code,row["country_name"],row["country_name"],row["country_name_en"],code,0))
     for code,country,country_name,cn,en,abbr in [
         ("CZ-01","CZ","捷克","捷克","Czech Republic","CZ"),
         ("CN-EAST","CN","中国","华东","East China","EAST"),
