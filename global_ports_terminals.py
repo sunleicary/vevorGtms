@@ -87,39 +87,61 @@ def name_country(name):
     return PORT_COUNTRY_LOOKUP.get(value)
 
 def infer_port_countries(conn, cols, port_fields):
-    """Geographic name match takes precedence over destination-warehouse country."""
+    """Destination warehouse country is authoritative for discharge ports only."""
     initialize_countries(conn)
     aliases=_alias_index(conn)
-    observations={}
+    discharge={}
+    pre_ids=set()
     if "目的仓国家" in cols:
         for field in port_fields:
-            query='SELECT "'+field+'" AS port_raw,"目的仓国家" AS country_raw FROM containers GROUP BY "'+field+'","目的仓国家"'
-            for row in conn.execute(query).fetchall():
-                name=clean(row["port_raw"])
-                if name:
-                    code=aliases.get(str(row["country_raw"] or "").strip().upper())
-                    if code:
-                        observations.setdefault(uid("port",name),set()).add(code)
-    name_assigned=0
-    business_assigned=0
+            if field not in POST_PORT_FIELDS and field not in PRE_PORT_FIELDS:
+                continue
+            if field in POST_PORT_FIELDS:
+                query='SELECT "'+field+'" AS port_raw,"目的仓国家" AS country_raw FROM containers GROUP BY "'+field+'","目的仓国家"'
+                for row in conn.execute(query).fetchall():
+                    name=clean(row["port_raw"])
+                    if name:
+                        code=aliases.get(str(row["country_raw"] or "").strip().upper())
+                        if code:
+                            discharge.setdefault(uid("port",name),set()).add(code)
+            else:
+                for row in conn.execute('SELECT DISTINCT "'+field+'" AS port_raw FROM containers').fetchall():
+                    name=clean(row["port_raw"])
+                    if name:
+                        pre_ids.add(uid("port",name))
+    else:
+        for field in port_fields:
+            if field in PRE_PORT_FIELDS:
+                for row in conn.execute('SELECT DISTINCT "'+field+'" AS port_raw FROM containers').fetchall():
+                    name=clean(row["port_raw"])
+                    if name:
+                        pre_ids.add(uid("port",name))
+    updated=0
     unresolved=0
+    conflicts=0
     for port in conn.execute("SELECT port_id,port_name,country_code FROM gtms_global_ports").fetchall():
         pid=port["port_id"]
-        code=name_country(port["port_name"])
-        if code:
-            # Geographic name evidence supersedes prior warehouse-derived guesses.
-            if port["country_code"] != code:
-                conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=?",(code,pid))
-                name_assigned+=1
-        elif not port["country_code"]:
-            candidates=observations.get(pid,set())
-            if len(candidates)==1:
-                # Only a provisional business-derived value, shown as such in UI.
-                conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=?",(next(iter(candidates)),pid))
-                business_assigned+=1
-            else:
-                unresolved+=1
-    return name_assigned,business_assigned,unresolved
+        countries=discharge.get(pid,set())
+        if len(countries)>1:
+            conflicts+=1
+            continue
+        # When a name appears in both origin and discharge fields, do not
+        # blindly apply the destination rule if it contradicts its geography.
+        geographic=name_country(port["port_name"])
+        if countries:
+            destination=next(iter(countries))
+            if pid in pre_ids and geographic and geographic!=destination:
+                conflicts+=1
+                continue
+            code=destination
+        else:
+            code=geographic
+        if code and port["country_code"]!=code:
+            conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=?",(code,pid))
+            updated+=1
+        elif not code and not port["country_code"]:
+            unresolved+=1
+    return updated,conflicts,unresolved
 
 def sync(conn):
     cols=table_columns(conn,"containers")
@@ -170,12 +192,12 @@ def sync(conn):
                 VALUES (?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET record_count=excluded.record_count""",
                 (sid,"terminal",tid,field,side,int(row["cnt"])))
             terminals_added.add(tid)
-    by_name,by_business,unresolved=infer_port_countries(conn,cols,port_fields)
-    return len(ports_added),len(terminals_added),by_name,by_business,unresolved
+    updated,conflicts,unresolved=infer_port_countries(conn,cols,port_fields)
+    return len(ports_added),len(terminals_added),updated,conflicts,unresolved
 
 def show_global_ports_terminals(user, db):
     st.title("全球港口与码头管理")
-    st.caption("港前港后共用主数据；仅依据实际存在的业务字段初始化。优先按明确的港口地名识别国家；未匹配名称才参考目的仓国家，跨国运输可能造成偏差。")
+    st.caption("港前港后共用主数据；仅依据实际存在的业务字段初始化。卸货港国家以业务表的目的仓国家为准；港前起运港按港口名称识别；来源冲突保留待核对。")
     with db_connect(db) as conn:
         initialize(conn)
         try:
@@ -191,7 +213,7 @@ def show_global_ports_terminals(user, db):
     a.metric("港口",len(ports))
     b.metric("码头",len(terminals))
     c.metric("本次发现的港口/码头",str(counts[0])+" / "+str(counts[1]))
-    st.caption(f"按港口名称修正/补充 {counts[2]} 条，依据目的仓国家补充 {counts[3]} 条；仍有 {counts[4]} 条缺少可靠国家依据。业务推断不等于地理核验。")
+    st.caption(f"国家代码更新 {counts[2]} 条；来源国家冲突 {counts[3]} 条；仍未识别 {counts[4]} 条。卸货港按目的仓国家确定，港前起运港按名称识别。")
     st.caption("同步只补充缺失的主数据并刷新来源计数，不覆盖人工编辑字段。")
     tab1,tab2,tab3=st.tabs(["港口主数据","码头主数据","业务来源与统计"])
     with tab1:
