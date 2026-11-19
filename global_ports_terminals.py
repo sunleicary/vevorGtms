@@ -51,37 +51,75 @@ def _side(field, kind, columns):
     # Shared columns have no reliable business-side attribution.
     return "未区分"
 
-def infer_port_countries(conn, cols, port_fields):
-    """Use observed country values, never assign when observations conflict.
+# Curated exact port-name aliases; avoid substring guesses (e.g. Portland).
+PORT_COUNTRY_NAMES = {
+ "US": "LOS ANGELES|LONG BEACH|LA/LB|NEW YORK|NEW JERSEY|SAVANNAH|HOUSTON|CHARLESTON|NORFOLK|BALTIMORE|MIAMI|OAKLAND|SEATTLE|TACOMA|JACKSONVILLE|MOBILE|NEW ORLEANS|BOSTON|PHILADELPHIA|WILMINGTON NC|洛杉矶|长滩|纽约|新泽西|萨凡纳|休斯顿|查尔斯顿|诺福克|巴尔的摩|迈阿密|奥克兰|西雅图|塔科马",
+ "CN": "SHANGHAI|NINGBO|NINGBO ZHOUSHAN|SHENZHEN|YANTIAN|SHEKOU|QINGDAO|TIANJIN|XINGANG|XIAMEN|GUANGZHOU|NANSHA|DALIAN|LIANYUNGANG|FUZHOU|RIZHAO|上海|宁波|舟山|深圳|盐田|蛇口|青岛|天津|新港|厦门|广州|南沙|大连|连云港|福州|日照",
+ "NL": "ROTTERDAM|AMSTERDAM|鹿特丹|阿姆斯特丹",
+ "DE": "HAMBURG|BREMERHAVEN|BREMEN|WILHELMSHAVEN|汉堡|不来梅港",
+ "BE": "ANTWERP|ANTWERPEN|ZEEBRUGGE|安特卫普|泽布吕赫",
+ "GB": "FELIXSTOWE|SOUTHAMPTON|LONDON GATEWAY|LIVERPOOL|IMMINGHAM|费利克斯托|南安普顿|利物浦",
+ "FR": "LE HAVRE|MARSEILLE|FOS SUR MER|DUNKIRK|勒阿弗尔|马赛|敦刻尔克",
+ "ES": "VALENCIA|BARCELONA|ALGECIRAS|BILBAO|瓦伦西亚|巴塞罗那|阿尔赫西拉斯",
+ "IT": "GENOA|GENOVA|LA SPEZIA|TRIESTE|NAPLES|GIOIA TAURO|热那亚|拉斯佩齐亚|的里雅斯特|那不勒斯",
+ "PL": "GDANSK|GDYNIA|格但斯克|格丁尼亚",
+ "CZ": "PRAGUE|PRAHA|布拉格",
+ "CA": "VANCOUVER|PRINCE RUPERT|MONTREAL|HALIFAX|温哥华|鲁珀特王子港|蒙特利尔|哈利法克斯",
+ "MX": "MANZANILLO|LAZARO CARDENAS|VERACRUZ|ALTAMIRA|曼萨尼约|拉萨罗卡德纳斯|韦拉克鲁斯",
+ "JP": "TOKYO|YOKOHAMA|OSAKA|KOBE|NAGOYA|HAKATA|东京|横滨|大阪|神户|名古屋",
+ "SG": "SINGAPORE|新加坡",
+ "MY": "PORT KLANG|KLANG|TANJUNG PELEPAS|PENANG|巴生港|丹绒帕拉帕斯|槟城",
+ "TH": "LAEM CHABANG|BANGKOK|林查班|曼谷",
+ "AE": "JEBEL ALI|KHALIFA PORT|迪拜杰贝阿里|杰贝阿里|哈利法港",
+ "AU": "SYDNEY|MELBOURNE|BRISBANE|FREMANTLE|ADELAIDE|悉尼|墨尔本|布里斯班|弗里曼特尔",
+}
+PORT_COUNTRY_LOOKUP = {alias.strip().upper(): code for code,names in PORT_COUNTRY_NAMES.items() for alias in names.split("|")}
 
-    Destination warehouse country is a business-derived candidate, not
-    independent geographic verification of a port's location.
-    """
-    if "目的仓国家" not in cols:
-        return 0,0
+def name_country(name):
+    import re
+    value=clean(name).upper()
+    value=re.sub(r"^(PORT OF|PORT|港口)\\s+", "", value).strip()
+    value=re.sub(r"\\s+(PORT|港)$", "", value).strip()
+    # ISO UN/LOCODE format, if explicitly supplied in a recognizable form.
+    match=re.fullmatch(r"([A-Z]{2})[- ]?([A-Z]{3})",value)
+    if match and match.group(1) in PORT_COUNTRY_NAMES:
+        return match.group(1)
+    return PORT_COUNTRY_LOOKUP.get(value)
+
+def infer_port_countries(conn, cols, port_fields):
+    """Geographic name match takes precedence over destination-warehouse country."""
     initialize_countries(conn)
     aliases=_alias_index(conn)
-    assigned=0
-    conflicts=0
     observations={}
-    for field in port_fields:
-        query='SELECT "'+field+'" AS port_raw,"目的仓国家" AS country_raw,COUNT(*) AS cnt FROM containers GROUP BY "'+field+'","目的仓国家"'
-        for row in conn.execute(query).fetchall():
-            name=clean(row["port_raw"])
-            if not name:
-                continue
-            code=aliases.get(str(row["country_raw"] or "").strip().upper())
-            if code:
-                observations.setdefault(uid("port",name),set()).add(code)
-    for pid,codes in observations.items():
-        if len(codes)!=1:
-            conflicts+=1
-            continue
-        code=next(iter(codes))
-        # Do not overwrite an existing manually curated country.
-        result=conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=? AND (country_code='' OR country_code IS NULL)",(code,pid))
-        assigned+=max(0,result.rowcount)
-    return assigned,conflicts
+    if "目的仓国家" in cols:
+        for field in port_fields:
+            query='SELECT "'+field+'" AS port_raw,"目的仓国家" AS country_raw FROM containers GROUP BY "'+field+'","目的仓国家"'
+            for row in conn.execute(query).fetchall():
+                name=clean(row["port_raw"])
+                if name:
+                    code=aliases.get(str(row["country_raw"] or "").strip().upper())
+                    if code:
+                        observations.setdefault(uid("port",name),set()).add(code)
+    name_assigned=0
+    business_assigned=0
+    unresolved=0
+    for port in conn.execute("SELECT port_id,port_name,country_code FROM gtms_global_ports").fetchall():
+        pid=port["port_id"]
+        code=name_country(port["port_name"])
+        if code:
+            # Geographic name evidence supersedes prior warehouse-derived guesses.
+            if port["country_code"] != code:
+                conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=?",(code,pid))
+                name_assigned+=1
+        elif not port["country_code"]:
+            candidates=observations.get(pid,set())
+            if len(candidates)==1:
+                # Only a provisional business-derived value, shown as such in UI.
+                conn.execute("UPDATE gtms_global_ports SET country_code=? WHERE port_id=?",(next(iter(candidates)),pid))
+                business_assigned+=1
+            else:
+                unresolved+=1
+    return name_assigned,business_assigned,unresolved
 
 def sync(conn):
     cols=table_columns(conn,"containers")
@@ -132,12 +170,12 @@ def sync(conn):
                 VALUES (?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET record_count=excluded.record_count""",
                 (sid,"terminal",tid,field,side,int(row["cnt"])))
             terminals_added.add(tid)
-    inferred,conflicts=infer_port_countries(conn,cols,port_fields)
-    return len(ports_added),len(terminals_added),inferred,conflicts
+    by_name,by_business,unresolved=infer_port_countries(conn,cols,port_fields)
+    return len(ports_added),len(terminals_added),by_name,by_business,unresolved
 
 def show_global_ports_terminals(user, db):
     st.title("全球港口与码头管理")
-    st.caption("港前港后共用主数据；仅依据实际存在的业务字段初始化。港口国家依据业务记录中的目的仓国家辅助填充；跨国运输可能造成偏差，冲突不自动覆盖。UN/LOCODE不作推断。")
+    st.caption("港前港后共用主数据；仅依据实际存在的业务字段初始化。优先按明确的港口地名识别国家；未匹配名称才参考目的仓国家，跨国运输可能造成偏差。")
     with db_connect(db) as conn:
         initialize(conn)
         try:
@@ -153,7 +191,7 @@ def show_global_ports_terminals(user, db):
     a.metric("港口",len(ports))
     b.metric("码头",len(terminals))
     c.metric("本次发现的港口/码头",str(counts[0])+" / "+str(counts[1]))
-    st.caption(f"依据目的仓国家字段填充了 {counts[2]} 条原先为空的港口国家；存在 {counts[3]} 次来源国家冲突，未自动覆盖。目的仓国家不一定等于港口所在地，建议核对跨国运输港口。")
+    st.caption(f"按港口名称修正/补充 {counts[2]} 条，依据目的仓国家补充 {counts[3]} 条；仍有 {counts[4]} 条缺少可靠国家依据。业务推断不等于地理核验。")
     st.caption("同步只补充缺失的主数据并刷新来源计数，不覆盖人工编辑字段。")
     tab1,tab2,tab3=st.tabs(["港口主数据","码头主数据","业务来源与统计"])
     with tab1:
