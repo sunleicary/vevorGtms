@@ -269,7 +269,8 @@ def show_global_ports_terminals(user, db):
             st.dataframe(pd.DataFrame(pending),hide_index=True,use_container_width=True)
     if not is_admin(user):
         return
-    st.subheader("主数据维护（整数 ID）")
+    st.subheader("主数据标准操作：增加 / 修改 / 删除 / 查询")
+    st.caption("上方表格支持查询与导出；下方支持增加、修改及安全删除。")
     kind=st.radio("对象",["港口","码头"],horizontal=True)
     records=ports if kind=="港口" else terminals
     id_field="port_id" if kind=="港口" else "terminal_id"
@@ -322,4 +323,29 @@ def show_global_ports_terminals(user, db):
                 else:
                     conn.execute("UPDATE gtms_terminals_v2 SET terminal_name=?,port_id=?,operator_name=?,terminal_type=?,source_url=?,verification_status=?,state_code=?,operating_region_code=? WHERE terminal_id=?",(name,selected_port,operator,terminal_type,source_url,verification,state.upper().strip(),region.upper().strip(),next_id))
         st.success("保存成功")
+        st.rerun()
+
+    st.divider()
+    st.subheader("删除主数据")
+    if selection=="新增":
+        st.caption("请选择现有记录后执行删除。")
+        return
+    with st.form("delete_port_terminal_v2"):
+        confirm=st.checkbox("确认永久删除所选记录")
+        delete=st.form_submit_button("删除所选记录")
+    if delete:
+        if not confirm:
+            st.error("请先勾选删除确认")
+            return
+        with db_connect(db) as conn:
+            if kind=="港口":
+                refs=conn.execute("SELECT COUNT(*) AS n FROM gtms_terminals_v2 WHERE port_id=?",(int(selection),)).fetchone()["n"]
+                canonical=conn.execute("SELECT COUNT(*) AS n FROM gtms_ports_v2 WHERE canonical_port_id=? AND port_id<>?",(int(selection),int(selection))).fetchone()["n"]
+                if refs or canonical:
+                    st.error(f"禁止删除：关联码头 {refs} 条，关联港口别名 {canonical} 条。请先处理关联关系。")
+                    return
+                conn.execute("DELETE FROM gtms_ports_v2 WHERE port_id=?",(int(selection),))
+            else:
+                conn.execute("DELETE FROM gtms_terminals_v2 WHERE terminal_id=?",(int(selection),))
+        st.success("删除成功")
         st.rerun()
