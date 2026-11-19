@@ -150,7 +150,6 @@ with st.sidebar:
         st.session_state.pop("sqlite_backup_zip", None)
         st.session_state.pop("sqlite_backup_filename", None)
         st.rerun()
-    st.caption("运营报表按排柜单号统计，港后报表使用港后拖车行。")
 
 # Pages without a migrated backend are visible as planned modules, not fake data forms.
 planned_modules = {
@@ -281,19 +280,8 @@ if page == "全球港后运营总览":
 # Existing US operations pages must not include newly imported non-US records.
 df = df[df["目的仓国家"].map(is_us_country)].copy()
 
-with st.sidebar:
-    regions = sorted(df["区域"].unique())
-    selected = st.multiselect("运营区域", regions, default=regions)
-    carriers = sorted(df["港后拖车行"].dropna().astype(str).loc[lambda s: s.str.strip().ne("")].unique())
-    carrier = st.selectbox("港后拖车商", ["全部"] + carriers)
-    eta_range = st.date_input("ETA范围", value=(date.today()-timedelta(days=30), date.today()+timedelta(days=60)))
-
-q = df[df["区域"].isin(selected)].copy()
-if carrier != "全部":
-    q = q[q["港后拖车行"] == carrier]
-if len(eta_range) == 2:
-    q = q[q["ETA日期_dt"].between(pd.Timestamp(eta_range[0]),
-        pd.Timestamp(eta_range[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1))]
+# Report on all US post-port records; no implicit sidebar filters.
+q = df.copy()
 
 today = pd.Timestamp(date.today())
 lfd, pickup = q["LFD_dt"], q["进口实际提箱时间_dt"]
