@@ -98,6 +98,9 @@ def show_country_regions(user, db):
     st.title("全球国家与业务区域管理")
     with db_connect(db) as conn:
         _initialize(conn)
+        initialized=conn.execute("SELECT COUNT(*) FROM gtms_region_source_values").fetchone()[0]
+        if not initialized:
+            _sync_existing(conn)
         if st.button("同步现有业务国家与区域", disabled=not is_admin(user)):
             count=_sync_existing(conn)
             st.success(f"已同步 {count} 组源数据国家/区域组合；原始货柜记录未修改。")
