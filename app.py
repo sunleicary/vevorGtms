@@ -20,6 +20,7 @@ from database_status import show_database_status
 from drayage_suppliers import show_drayage_suppliers
 from country_regions import show_country_regions
 from global_ports_terminals import show_global_ports_terminals
+from shipping_lines import show_shipping_lines
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -158,7 +159,6 @@ with st.sidebar:
 # Pages without a migrated backend are visible as planned modules, not fake data forms.
 planned_modules = {
 
-    "船司管理": "待建设船公司主数据与标准编码。",
     "清关行管理": "待建设清关服务商主数据。",
     "海外仓主数据管理": "待建设海外仓地址、区域及收货规则主数据。",
     "拖车行合同管理": "待建设合同、线路报价和生效日期管理。",
@@ -174,6 +174,10 @@ if page == "全球国家与业务区域管理":
 
 if page == "全球港口与码头管理":
     show_global_ports_terminals(user, DB)
+    st.stop()
+
+if page == "船司管理":
+    show_shipping_lines(user, DB)
     st.stop()
 
 if page == "角色管理":
