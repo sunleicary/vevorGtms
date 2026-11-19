@@ -208,15 +208,19 @@ def upgrade_v2_geography(conn):
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
     for name,state,region in [("ATLANTA","GA","US-ATL"),("HOUSTON","TX","US-HOU"),("LONG BEACH","CA","US-LALB"),("LOS ANGELES","CA","US-LALB"),("SAVANNAH","GA","US-SAV"),("SEATTLE","WA","US-LALB"),("TACOMA","WA","US-LALB")]:
         conn.execute("UPDATE gtms_ports_v2 SET state_code=?,operating_region_code=? WHERE country_code='US' AND (UPPER(port_name)=? OR UPPER(port_name) LIKE ?) AND state_code=''",(state,region,name,name+",%"))
+    # Always seed Port Newark and PNCT, including when neither exists in the imported CSV.
+    port=conn.execute("SELECT port_id FROM gtms_ports_v2 WHERE UPPER(TRIM(port_name))='PORT NEWARK' AND country_code='US' LIMIT 1").fetchone()
+    if port:
+        pid=port["port_id"]
+    else:
+        pid=int(conn.execute("SELECT COALESCE(MAX(port_id),0)+1 AS n FROM gtms_ports_v2").fetchone()["n"])
+        conn.execute("INSERT INTO gtms_ports_v2(port_id,port_name,country_code,unlocode,canonical_port_id,classification,legacy_port_id,state_code,operating_region_code) VALUES (?,?,?,?,?,?,?,?,?)",(pid,"PORT NEWARK","US","USNWK",pid,"seaport_or_port_city","gtms-system-port-newark","NJ","US-NJ"))
+    conn.execute("UPDATE gtms_ports_v2 SET state_code='NJ',operating_region_code='US-NJ' WHERE port_id=?",(pid,))
     pnct=conn.execute("SELECT terminal_id FROM gtms_terminals_v2 WHERE UPPER(terminal_name) LIKE '%PORT NEWARK CONTAINER TERMINAL%' OR UPPER(TRIM(terminal_name))='PNCT'").fetchall()
-    if pnct:
-        port=conn.execute("SELECT port_id FROM gtms_ports_v2 WHERE UPPER(TRIM(port_name))='PORT NEWARK' AND country_code='US' LIMIT 1").fetchone()
-        if port:
-            pid=port["port_id"]
-        else:
-            pid=int(conn.execute("SELECT COALESCE(MAX(port_id),0)+1 AS n FROM gtms_ports_v2").fetchone()["n"])
-            conn.execute("INSERT INTO gtms_ports_v2(port_id,port_name,country_code,unlocode,canonical_port_id,classification,legacy_port_id,state_code,operating_region_code) VALUES (?,?,?,?,?,?,?,?,?)",(pid,"PORT NEWARK","US","USNWK",pid,"seaport_or_port_city","gtms-system-port-newark","NJ","US-NJ"))
-        conn.execute("UPDATE gtms_ports_v2 SET state_code='NJ',operating_region_code='US-NJ' WHERE port_id=?",(pid,))
+    if not pnct:
+        tid=int(conn.execute("SELECT COALESCE(MAX(terminal_id),0)+1 AS n FROM gtms_terminals_v2").fetchone()["n"])
+        conn.execute("INSERT INTO gtms_terminals_v2(terminal_id,terminal_name,port_id,operator_name,terminal_type,source_url,verification_status,legacy_terminal_id,state_code,operating_region_code) VALUES (?,?,?,?,?,?,?,?,?,?)",(tid,"Port Newark Container Terminal (PNCT)",pid,"Port Newark Container Terminal","container","https://www.pnct.net/","official_source_reviewed","gtms-system-pnct","NJ","US-NJ"))
+    else:
         for t in pnct:
             conn.execute("UPDATE gtms_terminals_v2 SET port_id=?,state_code='NJ',operating_region_code='US-NJ' WHERE terminal_id=?",(pid,t["terminal_id"]))
     for pattern in ("%MAHER%","%APM TERMINALS ELIZABETH%","%PORT LIBERTY BAYONNE%","%GCT BAYONNE%"):
