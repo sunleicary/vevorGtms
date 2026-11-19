@@ -1,7 +1,8 @@
 """Country and operating-region master data."""
+import json
 import pandas as pd
 import streamlit as st
-from db_backend import connect as db_connect
+from db_backend import connect as db_connect, is_neon
 from auth import is_admin
 
 REGIONS = [
@@ -33,6 +34,34 @@ COUNTRIES = [
  ("CZ","捷克","Czech Republic",["捷克","CZ","CZECH REPUBLIC","CZECHIA"]),
  ("CN","中国","China",["中国","CN","CHINA","PRC"]),
 ]
+def _aliases(row):
+    try:
+        values=json.loads(row["aliases"] or "[]")
+        return values if isinstance(values,list) else []
+    except (ValueError,TypeError):
+        return []
+
+def _alias_index(conn):
+    index={}
+    for row in conn.execute("SELECT country_code,country_name,country_name_en,aliases FROM gtms_countries").fetchall():
+        for alias in [row["country_code"],row["country_name"],row["country_name_en"]]+_aliases(row):
+            key=_normalize(alias)
+            if key:
+                index[key]=row["country_code"]
+    return index
+
+def _add_alias(conn,code,alias):
+    row=conn.execute("SELECT aliases FROM gtms_countries WHERE country_code=?",(code,)).fetchone()
+    if row is None:
+        raise ValueError("国家编码不存在")
+    alias=_normalize(alias)
+    index=_alias_index(conn)
+    if alias in index and index[alias]!=code:
+        raise ValueError("别名已属于另一个国家")
+    values=sorted(set(_normalize(x) for x in _aliases(row))|{alias})
+    conn.execute("UPDATE gtms_countries SET aliases=? WHERE country_code=?",
+                 (json.dumps(values,ensure_ascii=False),code))
+
 def _normalize(value):
     return str(value or "").strip().upper()
 def _region_code(value):
@@ -53,9 +82,13 @@ def _region_code(value):
 def _initialize(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS gtms_countries (
         country_code TEXT PRIMARY KEY, country_name TEXT NOT NULL,
-        country_name_en TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1)""")
-    conn.execute("""CREATE TABLE IF NOT EXISTS gtms_country_aliases (
-        alias TEXT PRIMARY KEY, country_code TEXT NOT NULL)""")
+        country_name_en TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+        aliases TEXT NOT NULL DEFAULT '[]')""")
+    columns=[r["name"] for r in conn.execute("PRAGMA table_info(gtms_countries)").fetchall()] if not is_neon() else [
+        r["column_name"] for r in conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name='gtms_countries'").fetchall()]
+    if "aliases" not in columns:
+        conn.execute("ALTER TABLE gtms_countries ADD COLUMN aliases TEXT NOT NULL DEFAULT '[]'")
     conn.execute("""CREATE TABLE IF NOT EXISTS gtms_country_candidates (
         country_raw TEXT PRIMARY KEY, record_count INTEGER NOT NULL,
         status TEXT NOT NULL DEFAULT '待确认')""")
@@ -69,9 +102,18 @@ def _initialize(conn):
         region_name_en TEXT NOT NULL, abbreviation TEXT NOT NULL,
         sort_order INTEGER NOT NULL DEFAULT 99, enabled INTEGER NOT NULL DEFAULT 1)""")
     for code,cn,en,aliases in COUNTRIES:
-        conn.execute("INSERT INTO gtms_countries(country_code,country_name,country_name_en) VALUES (?,?,?) ON CONFLICT(country_code) DO NOTHING",(code,cn,en))
-        for alias in aliases:
-            conn.execute("INSERT INTO gtms_country_aliases(alias,country_code) VALUES (?,?) ON CONFLICT(alias) DO NOTHING",(_normalize(alias),code))
+        conn.execute("""INSERT INTO gtms_countries
+            (country_code,country_name,country_name_en,aliases)
+            VALUES (?,?,?,?) ON CONFLICT(country_code) DO NOTHING""",
+            (code,cn,en,json.dumps(sorted(set(_normalize(x) for x in aliases)),ensure_ascii=False)))
+    # One-time migration: preserve manually mapped aliases from the former table.
+    legacy_exists=(conn.execute("SELECT 1 FROM information_schema.tables WHERE table_name='gtms_country_aliases'").fetchone()
+        if is_neon() else conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gtms_country_aliases'").fetchone())
+    if legacy_exists:
+        for row in conn.execute("SELECT alias,country_code FROM gtms_country_aliases").fetchall():
+            if conn.execute("SELECT 1 FROM gtms_countries WHERE country_code=?",(row["country_code"],)).fetchone():
+                _add_alias(conn,row["country_code"],row["alias"])
+        conn.execute("DROP TABLE gtms_country_aliases")
     for code,country,country_name,cn,en,abbr in [
         ("CZ-01","CZ","捷克","捷克","Czech Republic","CZ"),
         ("CN-EAST","CN","中国","华东","East China","EAST"),
@@ -97,7 +139,7 @@ def _sync_existing(conn):
         if "no such table" in str(exc).lower() or "does not exist" in str(exc).lower():
             return 0
         raise
-    aliases={r["alias"]:r["country_code"] for r in conn.execute("SELECT alias,country_code FROM gtms_country_aliases").fetchall()}
+    aliases=_alias_index(conn)
     conn.execute("DELETE FROM gtms_region_source_values")
     counts={}
     for row in source:
@@ -150,7 +192,7 @@ def show_country_regions(user, db):
     records=[dict(r) for r in rows]
     st.caption("主数据与原始业务数据分开存储；国家采用 ISO 两位编码，美国区域采用 US- 前缀。")
     st.subheader("国家主数据")
-    st.dataframe(pd.DataFrame([dict(x) for x in countries]),hide_index=True,use_container_width=True)
+    st.dataframe(pd.DataFrame([{**dict(x),"aliases":"、".join(_aliases(x))} for x in countries]),hide_index=True,use_container_width=True)
     st.subheader("现有数据中未识别的国家名称")
     pending=[dict(x) for x in candidates]
     if pending:
@@ -164,7 +206,7 @@ def show_country_regions(user, db):
             if resolve:
                 code=target.split(" · ",1)[0]
                 with db_connect(db) as conn:
-                    conn.execute("INSERT INTO gtms_country_aliases(alias,country_code) VALUES (?,?) ON CONFLICT(alias) DO UPDATE SET country_code=excluded.country_code",(_normalize(raw),code))
+                    _add_alias(conn,code,raw)
                     _sync_existing(conn)
                 st.success("国家映射已保存。")
                 st.rerun()
