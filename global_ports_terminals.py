@@ -1,5 +1,6 @@
 """Global ports and terminals master data, shared by pre-port and post-port operations."""
 import hashlib
+import re
 import pandas as pd
 import streamlit as st
 from db_backend import connect as db_connect, is_neon
@@ -78,6 +79,9 @@ PORT_COUNTRY_LOOKUP = {alias.strip().upper(): code for code,names in PORT_COUNTR
 def name_country(name):
     import re
     value=clean(name).upper()
+    suffix=re.search(r",\\s*([A-Z]{2})\\s*$", value)
+    if suffix and suffix.group(1) in PORT_COUNTRY_NAMES:
+        return suffix.group(1)
     value=re.sub(r"^(PORT OF|PORT|港口)\\s+", "", value).strip()
     value=re.sub(r"\\s+(PORT|港)$", "", value).strip()
     # ISO UN/LOCODE format, if explicitly supplied in a recognizable form.
