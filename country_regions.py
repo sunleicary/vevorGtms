@@ -185,6 +185,16 @@ def _sync_existing(conn):
         raw_region=str(row["region_raw"] or "").strip()
         country=aliases.get(_normalize(raw_country))
         region=_resolve_region(conn,country,raw_region)
+        # Explicit country-specific "other" bucket in source mappings.
+        # Do not create an additional US operating-region master record.
+        if country=="US" and _normalize(raw_region) in {
+            "美国-TIKTOK抖音官方仓","美国-其他"
+        }:
+            region="US-OTHER"
+        if country=="CZ" and _normalize(raw_region) in {
+            "欧洲-西班牙","欧洲-法国","欧洲-意大利"
+        }:
+            region="CZ-OTHER"
         # Country-specific source labels that correspond to existing subregions.
         if country=="CZ" and raw_region=="欧洲-捷克":
             region="CZ-01"
