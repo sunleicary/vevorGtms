@@ -14,7 +14,7 @@ from monthly_kpi import show_monthly_kpi
 from monthly_supplier_entry import show_monthly_supplier_entry
 from global_overview import show_global_overview, is_us_country
 from theme import apply_theme
-from auth import login_gate, manage_users, change_own_password
+from auth import login_gate, manage_users, change_own_password, manage_roles, permitted_modules, is_admin
 from database_backup import show_database_backup
 from database_status import show_database_status
 from drayage_suppliers import show_drayage_suppliers
@@ -88,20 +88,20 @@ with st.sidebar:
         "权限管理": ["角色管理", "用户管理"],
         "系统管理": ["系统数据备份", "业务数据导入管理", "数据库连接状态管理"],
     }
-    admin_domains = {"权限管理", "系统管理"}
-    visible_domains = [domain for domain in navigation
-                       if domain not in admin_domains or user["role"] == "管理员"]
+    allowed_modules = permitted_modules(user)
+    visible_domains = [domain for domain in navigation if any(item in allowed_modules for item in navigation[domain])]
     # Tree navigation: expand/collapse first-level groups and click child pages.
     icons = {
         "港后运营管理": "01", "港后拖车行结算管理": "02",
         "企业主数据管理": "03", "权限管理": "04",
         "系统管理": "05",
     }
-    default_module = "港后运营工作台"
-    if st.session_state.get("gtms_active_module") not in [
-        item for group in visible_domains for item in navigation[group]
-    ]:
-        st.session_state["gtms_active_module"] = default_module
+    available_modules = [item for group in visible_domains for item in navigation[group] if item in allowed_modules]
+    if not available_modules:
+        st.warning("当前角色尚未开放业务页面，请联系系统管理员授权。")
+        st.stop()
+    if st.session_state.get("gtms_active_module") not in available_modules:
+        st.session_state["gtms_active_module"] = available_modules[0]
     module = st.session_state["gtms_active_module"]
     for domain in visible_domains:
         with st.expander(
@@ -109,6 +109,8 @@ with st.sidebar:
             expanded=module in navigation[domain],
         ):
             for item in navigation[domain]:
+                if item not in allowed_modules:
+                    continue
                 active = item == module
                 if st.button(
                     f'{"▏ " if active else ""}{item}',
@@ -153,7 +155,6 @@ with st.sidebar:
 
 # Pages without a migrated backend are visible as planned modules, not fake data forms.
 planned_modules = {
-    "角色管理": "角色与页面权限矩阵将在后续版本接入现有登录体系。",
     "全球国家与业务区域管理": "待建设国家、区域和业务覆盖范围主数据。",
     "全球港后港口与码头管理": "待建设港口、码头及国家区域关联主数据。",
     "船司管理": "待建设船公司主数据与标准编码。",
@@ -162,6 +163,14 @@ planned_modules = {
     "拖车行合同管理": "待建设合同、线路报价和生效日期管理。",
     "账期与费用结算管理": "待建设对账、账期和结算管理。",
 }
+if module not in allowed_modules:
+    st.error("当前账号无权访问此模块。")
+    st.stop()
+
+if page == "角色管理":
+    manage_roles(user)
+    st.stop()
+
 if page in planned_modules:
     st.title(page)
     st.info(planned_modules[page])
@@ -193,7 +202,7 @@ if page == "我的账号":
 
 # Allow first-time cloud imports before attempting to read the database.
 if page == "业务主键质量检查":
-    if user["role"] != "管理员":
+    if not is_admin(user):
         st.error("仅管理员可查看数据质量检查。")
         st.stop()
     if not is_neon() and not os.path.exists(DB):
@@ -227,7 +236,7 @@ if page == "业务主键质量检查":
     st.stop()
 
 if page == "数据管理":
-    if user["role"] != "管理员":
+    if not is_admin(user):
         st.error("权限不足：仅管理员可访问数据管理及上传业务数据。")
         st.stop()
     st.subheader("业务数据管理")
