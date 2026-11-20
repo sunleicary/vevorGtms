@@ -25,6 +25,7 @@ from customs_brokers import show_customs_brokers
 from warehouses import show_warehouses
 from drayage_master import show_drayage_master
 from postport_do_assignment import show_do_assignment
+from contract_rates import show_contract_rates
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -163,7 +164,6 @@ with st.sidebar:
 # Pages without a migrated backend are visible as planned modules, not fake data forms.
 planned_modules = {
 
-    "拖车行合同管理": "待建设合同、线路报价和生效日期管理。",
     "账期与费用结算管理": "待建设对账、账期和结算管理。",
 }
 if module not in allowed_modules:
@@ -196,6 +196,10 @@ if page == "船司管理":
 
 if page == "角色管理":
     manage_roles(user)
+    st.stop()
+
+if page == "拖车行合同管理":
+    show_contract_rates(user, DB)
     st.stop()
 
 if page in planned_modules:
