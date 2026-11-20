@@ -72,6 +72,8 @@ def show_warehouses(user,db):
         st.dataframe(pd.DataFrame(sources),hide_index=True,use_container_width=True)
         st.download_button("导出仓库来源",pd.DataFrame(sources).to_csv(index=False).encode("utf-8-sig"),"gtms_warehouse_sources.csv","text/csv")
     if not is_admin(user):return
+    from warehouse_addresses import show_address_import
+    show_address_import(user,db)
     st.subheader("增加 / 修改")
     options={str(r["warehouse_id"]):r for r in records}
     selected=st.selectbox("选择仓库",["新增"]+list(options),format_func=lambda k:"新增仓库" if k=="新增" else f"{k} · {options[k]['warehouse_name']}")
