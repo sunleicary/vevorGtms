@@ -146,6 +146,22 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
     margin-left:0!important;
     margin-right:0!important;
 }
+
+/* ETA date control: yellow label and selected date text, dark readable field. */
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] label p,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-testid="stWidgetLabel"] p {
+    color:#ffdf45!important;font-weight:800!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] input,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] input:disabled {
+    color:#ffdf45!important;
+    -webkit-text-fill-color:#ffdf45!important;
+    font-weight:800!important;
+    background:#122c50!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"] {
+    background:#122c50!important;
+}
 </style>'''
 
 def apply_theme():
