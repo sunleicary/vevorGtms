@@ -197,6 +197,31 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
 [data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"] > div {
     background:#122c50!important;
 }
+
+/* Definitive sidebar operational input contrast: light fields, dark values. */
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"],
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"],
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"],
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"] > div,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"] > div,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"] > div {
+    background:#ffffff!important;
+    background-color:#ffffff!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"] *,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"] *,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"] *,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] input {
+    color:#0b2b5f!important;
+    -webkit-text-fill-color:#0b2b5f!important;
+    opacity:1!important;
+    font-weight:800!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] label p,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-testid="stWidgetLabel"] p {
+    color:#ffdf45!important;
+    -webkit-text-fill-color:#ffdf45!important;
+}
 </style>'''
 
 def apply_theme():
