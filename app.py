@@ -27,6 +27,7 @@ from drayage_master import show_drayage_master
 from postport_do_assignment import show_do_assignment
 from contract_rates import show_contract_rates
 from logistics_ai import show_logistics_ai
+from arrival_workbench import show_arrival_workbench
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -144,6 +145,7 @@ with st.sidebar:
     if module == "港后运营工作台":
         # Preserve all existing reporting functions inside the operations workbench.
         workbench_views = {
+            "港口与铁路到站动态": "港口与铁路到站动态",
             "运营总览": "运营总览",
             "全球港后运营总览": "全球港后运营总览",
             "全美港后供应商总览": "全美港后供应商总览",
@@ -367,6 +369,9 @@ with st.sidebar:
 df = scope.copy()
 if selected_supplier not in ("美国所有拖车商", "全部拖车商"):
     df = df[df["港后拖车行"].fillna("").astype(str).str.strip().eq(selected_supplier)].copy()
+if page == "港口与铁路到站动态":
+    show_arrival_workbench(df)
+    st.stop()
 if eta_enabled:
     if eta_range is not None and len(eta_range) == 2:
         start_eta, end_eta = eta_range
