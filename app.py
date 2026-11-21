@@ -26,6 +26,7 @@ from warehouses import show_warehouses
 from drayage_master import show_drayage_master
 from postport_do_assignment import show_do_assignment
 from contract_rates import show_contract_rates
+from logistics_ai import show_logistics_ai
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -83,7 +84,7 @@ with st.sidebar:
     # Five business domains; labels are kept separate from legacy handlers.
     navigation = {
         "港后运营管理": [
-            "港后运营工作台", "港后拖车商DO分配", "港后LFD智能预警管理",
+            "港后运营工作台", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理",
             "港后供应商产能与计划管理", "港后供应商绩效KPI管理",
         ],
         "港后拖车行结算管理": [
@@ -196,6 +197,10 @@ if page == "船司管理":
 
 if page == "角色管理":
     manage_roles(user)
+    st.stop()
+
+if page == "物流AI助理":
+    show_logistics_ai(user, DB)
     st.stop()
 
 if page == "拖车行合同管理":
