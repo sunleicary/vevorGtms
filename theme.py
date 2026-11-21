@@ -174,6 +174,16 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
 [data-testid="stSidebar"] [data-testid="stDateInput"] [data-testid="stWidgetLabel"] p {
     color:#ffdf45!important;
 }
+
+/* Operational filter labels only: yellow on navy; input values remain dark blue. */
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-testid="stWidgetLabel"] p,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-testid="stWidgetLabel"] p,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] label p,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] label p {
+    color:#ffdf45!important;
+    -webkit-text-fill-color:#ffdf45!important;
+    font-weight:800!important;
+}
 </style>'''
 
 def apply_theme():
