@@ -322,32 +322,54 @@ for col in ["ETA日期", "ATA日期", "LFD", "进口实际提箱时间", "实际
 # The date range is inclusive; missing/invalid ETA is excluded only when a range is enabled.
 with st.sidebar:
     st.markdown("### 运营数据筛选")
-    region_options = sorted(df["区域"].dropna().unique().tolist())
-    selected_region = st.selectbox("运营区域", ["全部区域"] + region_options, key="gtms_filter_region")
+    # Keep a global option, but default to all US destinations.
+    us_mask = df["目的仓国家"].map(is_us_country)
+    country_names = df["目的仓国家"].fillna("").astype(str).str.strip()
+    global_regions = sorted(set(df["区域"].dropna().tolist()))
+    # Non-US areas retain their country so different countries are not conflated.
+    df["运营区域选项"] = df["区域"]
+    non_us = ~us_mask
+    df.loc[non_us, "运营区域选项"] = (
+        country_names.loc[non_us].replace("", "国家未填写")
+        + " / " + df.loc[non_us, "目的仓物流区域"].fillna("区域未填写").astype(str)
+    )
+    region_options = ["美国所有区域", "全球所有区域"] + sorted(
+        set(df["运营区域选项"].dropna().tolist()) - {"美国所有区域", "全球所有区域"}
+    )
+    selected_region = st.selectbox("运营区域", region_options, key="gtms_filter_region")
+    if selected_region == "美国所有区域":
+        scope = df.loc[us_mask]
+    elif selected_region == "全球所有区域":
+        scope = df
+    else:
+        scope = df.loc[df["运营区域选项"].eq(selected_region)]
     supplier_options = sorted(
-        v for v in df["港后拖车行"].fillna("").astype(str).str.strip().unique()
+        v for v in scope["港后拖车行"].fillna("").astype(str).str.strip().unique()
         if v and v.casefold() not in ("nan", "none", "null")
     )
-    selected_supplier = st.selectbox("港后拖车商", ["全部拖车商"] + supplier_options, key="gtms_filter_supplier")
-    eta_values = df["ETA日期_dt"].dropna()
-    eta_enabled = st.checkbox("启用 ETA 范围筛选", value=False, key="gtms_filter_eta_enabled")
+    supplier_choices = ["美国所有拖车商" if selected_region == "美国所有区域" else "全部拖车商"] + supplier_options
+    if st.session_state.get("gtms_filter_supplier") not in supplier_choices:
+        st.session_state["gtms_filter_supplier"] = supplier_choices[0]
+    selected_supplier = st.selectbox("港后拖车商", supplier_choices, key="gtms_filter_supplier")
+    eta_enabled = st.checkbox("启用 ETA 范围筛选", value=True, key="gtms_filter_eta_enabled")
     eta_range = None
-    if eta_enabled and not eta_values.empty:
-        eta_min, eta_max = eta_values.min().date(), eta_values.max().date()
-        eta_range = st.date_input("ETA范围（含起止日）", value=(eta_min, eta_max),
-                                  min_value=eta_min, max_value=eta_max, key="gtms_filter_eta_range")
-    elif eta_enabled:
-        st.warning("当前业务数据没有有效 ETA 日期。")
-if selected_region != "全部区域":
-    df = df[df["区域"].eq(selected_region)].copy()
-if selected_supplier != "全部拖车商":
+    if eta_enabled:
+        today_filter = date.today()
+        first_this_month = today_filter.replace(day=1)
+        prev_month_end = first_this_month - timedelta(days=1)
+        start_default = prev_month_end.replace(day=1)
+        next_month_start = (first_this_month.replace(day=28) + timedelta(days=4)).replace(day=1)
+        end_default = (next_month_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        eta_range = st.date_input("ETA范围（含起止日）", value=(start_default, end_default),
+                                  key="gtms_filter_eta_range")
+# Apply geographic scope first, then supplier and inclusive ETA.
+df = scope.copy()
+if selected_supplier not in ("美国所有拖车商", "全部拖车商"):
     df = df[df["港后拖车行"].fillna("").astype(str).str.strip().eq(selected_supplier)].copy()
 if eta_enabled:
     if eta_range is not None and len(eta_range) == 2:
         start_eta, end_eta = eta_range
         df = df[df["ETA日期_dt"].dt.date.between(start_eta, end_eta)].copy()
-    elif eta_values.empty:
-        df = df.iloc[0:0].copy()
     else:
         st.info("请选择完整的 ETA 起止日期。")
         st.stop()
