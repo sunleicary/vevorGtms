@@ -50,7 +50,8 @@ def _prepare(df):
     z.loc[z["港后供应商"].isin(["", "nan", "None", "港后拖车测试"]), "港后供应商"] = "待分配/未记录"
     for field in ("ETA日期", "ATA日期", "LFD", "进口实际提箱时间", "实际送仓时间", "实际还柜日期"):
         z[field + "_dt"] = pd.to_datetime(z[field], errors="coerce", format="mixed")
-    z["已到港"] = z["ATA日期_dt"].notna()
+    z["统计日期_dt"] = z["ETA日期_dt"].fillna(pd.to_datetime(z.get("目的港预计卸柜时间", pd.Series("", index=z.index)), errors="coerce", format="mixed"))
+    z["已到港"] = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").notna()
     z["已提柜"] = z["进口实际提箱时间_dt"].notna()
     z["已送仓"] = z["实际送仓时间_dt"].notna()
     z["已还空"] = z["实际还柜日期_dt"].notna()
@@ -99,31 +100,31 @@ def show_global_overview(df):
         st.error("缺少必要字段：" + "、".join(sorted(required - set(df.columns))))
         return
     data = _prepare(df)
-    valid = data["ETA日期_dt"].dropna()
+    valid = data["统计日期_dt"].dropna()
     years = sorted(valid.dt.year.unique().astype(int).tolist(), reverse=True)
     f1, f2, f3 = st.columns([1, 1.5, 1.5])
     with f1:
-        mode = st.selectbox("数据时间口径", ["全部历史记录", "按ETA日期"], key="global_mode")
+        mode = st.selectbox("数据时间口径", ["全部历史记录", "按统计日期"], key="global_mode")
     with f2:
-        if mode == "按ETA日期" and years:
+        if mode == "按统计日期" and years:
             yr = st.selectbox("ETA年份", years, index=years.index(2026) if 2026 in years else 0, key="global_year")
         else:
             yr = None
-            st.caption("历史模式包括没有 ETA 的记录")
+            st.caption("沿用左侧筛选；统计日期优先 ETA，缺失取预计卸柜时间")
     with f3:
         if yr is not None:
-            dates = st.date_input("ETA日期区间", (date(yr, 1, 1), date(yr, 12, 31)),
+            dates = st.date_input("统计日期区间", (date(yr, 1, 1), date(yr, 12, 31)),
                                   key=f"global_dates_{yr}")
         else:
             dates = None
-    if mode == "按ETA日期":
+    if mode == "按统计日期":
         if not years:
             st.warning("无有效 ETA 日期，请使用全部历史记录模式。")
             return
         if not dates or len(dates) != 2:
             st.info("请选择完整的 ETA 起止日期。")
             return
-        data = data[data["ETA日期_dt"].between(pd.Timestamp(dates[0]),
+        data = data[data["统计日期_dt"].between(pd.Timestamp(dates[0]),
             pd.Timestamp(dates[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1))].copy()
     if data.empty:
         st.info("当前时间窗口内无货柜记录。")
@@ -134,7 +135,7 @@ def show_global_overview(df):
     z = data if country == "全球全部" else data[data["国家"].eq(country)]
     total = len(z)
     kpis = [("总柜量", total), ("区域数", len(z[["国家", "区域"]].drop_duplicates())),
-            ("已到港", int(z["已到港"].sum())), ("已提柜", int(z["已提柜"].sum())),
+            ("已到港/站", int(z["已到港"].sum())), ("已提柜", int(z["已提柜"].sum())),
             ("已送仓", int(z["已送仓"].sum())), ("已还空", int(z["已还空"].sum())),
             ("待分配", int(z["待分配"].sum())), ("LFD超期待核实", int(z["LFD超期待核实"].sum()))]
     for col, (label, value) in zip(st.columns(8), kpis):
