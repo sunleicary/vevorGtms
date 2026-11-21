@@ -1,5 +1,5 @@
 """美国港后拖车供应商KPI：依据《国际物流服务质量协议（2026年11月版）》港后条款。"""
-from datetime import date
+from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
 
@@ -31,14 +31,14 @@ def show_kpi_overview(df):
                               ["全部供应商"] + sorted(scoped["供应商"].unique().tolist()),
                               key="kpi_vendor")
     with c3:
-        dates = st.date_input("ETA统计区间", (date.today().replace(month=1, day=1), date.today()),
+        dates = st.date_input("ETA统计区间", (date.today()-timedelta(days=14), date.today()+timedelta(days=14)),
                               key="kpi_eta_dates")
     if vendor != "全部供应商":
         scoped = scoped[scoped["供应商"].eq(vendor)]
     if len(dates) != 2:
         st.info("请选择完整ETA起止日期。")
         return
-    scoped = scoped[scoped["ETA日期_kpi_dt"].between(
+    scoped = scoped[scoped["统计日期_dt"].between(
         pd.Timestamp(dates[0]), pd.Timestamp(dates[1]) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1))].copy()
     if scoped.empty:
         st.info("当前筛选范围没有可考核的港后业务记录。")
