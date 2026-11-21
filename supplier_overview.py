@@ -1,5 +1,5 @@
 """全美港后供应商总览：按 ETA 和目的仓区域统计，供应商只取港后拖车行。"""
-from datetime import date
+from datetime import date, timedelta
 import pandas as pd
 import streamlit as st
 
@@ -29,7 +29,7 @@ def show_supplier_overview(df, grid):
     with a:
         year = st.selectbox("统计年份（ETA）", years, index=years.index(default_year), key="supplier_year")
     with b:
-        date_range = st.date_input("统计日期区间", (date(year,1,1),date(year,12,31)),
+        date_range = st.date_input("统计日期区间", (date.today()-timedelta(days=14),date.today()+timedelta(days=14)),
                                    key=f"supplier_dates_{year}")
     with c:
         selected_regions = st.multiselect("统计区域", REGIONS, default=REGIONS, key="supplier_regions")
