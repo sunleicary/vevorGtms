@@ -20,7 +20,7 @@ def show_supplier_overview(df, grid):
     st.markdown('<div class="supplier-hero"><h2>🚛 美国全美六大区域港后拖车业务需求与供应商分配分析</h2>'
                 '<p>U.S. Six Regions · Post-Port Trucking Demand & Supplier Allocation</p></div>',
                 unsafe_allow_html=True)
-    years = sorted(df["ETA日期_dt"].dropna().dt.year.astype(int).unique().tolist(), reverse=True)
+    years = sorted(df["统计日期_dt"].dropna().dt.year.astype(int).unique().tolist(), reverse=True)
     if not years:
         st.warning("当前数据库缺少有效 ETA 日期，无法生成按 ETA 统计的供应商总览。")
         return
@@ -29,21 +29,21 @@ def show_supplier_overview(df, grid):
     with a:
         year = st.selectbox("统计年份（ETA）", years, index=years.index(default_year), key="supplier_year")
     with b:
-        date_range = st.date_input("ETA 统计区间", (date(year,1,1),date(year,12,31)),
+        date_range = st.date_input("统计日期区间", (date(year,1,1),date(year,12,31)),
                                    key=f"supplier_dates_{year}")
     with c:
         selected_regions = st.multiselect("统计区域", REGIONS, default=REGIONS, key="supplier_regions")
     if len(date_range)!=2:
         st.info("请选择开始和结束日期。")
         return
-    z=df[df["区域"].isin(selected_regions) & df["ETA日期_dt"].between(
+    z=df[df["区域"].isin(selected_regions) & df["统计日期_dt"].between(
         pd.Timestamp(date_range[0]),pd.Timestamp(date_range[1])+pd.Timedelta(days=1)-pd.Timedelta(seconds=1))].copy()
     if z.empty:
         st.info("当前 ETA 区间及区域内暂无货柜数据。")
         return
     z["供应商"]=z["港后拖车行"].fillna("").astype(str).str.strip()
     z.loc[z["供应商"].isin(["", "nan", "None", "港后拖车测试"]), "供应商"] = "待分配/未记录"
-    z["月份"]=z["ETA日期_dt"].dt.strftime("%Y-%m")
+    z["月份"]=z["统计日期_dt"].dt.strftime("%Y-%m")
     total=len(z)
     pending=int(z["供应商"].eq("待分配/未记录").sum())
     allocated=total-pending
