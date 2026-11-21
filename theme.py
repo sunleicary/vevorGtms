@@ -162,6 +162,41 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
 [data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"] {
     background:#122c50!important;
 }
+
+/* Scoped high-contrast fixes for operational filters, including BaseWeb internals. */
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"],
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"],
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"] > div,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"] > div {
+    background:#ffffff!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"] [role="combobox"],
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"] [role="combobox"],
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"] [role="combobox"] *,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"] [role="combobox"] *,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"] input,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"] input {
+    color:#0b2b5f!important;
+    -webkit-text-fill-color:#0b2b5f!important;
+    opacity:1!important;
+    font-weight:750!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_region"] [data-baseweb="select"] svg,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_supplier"] [data-baseweb="select"] svg {
+    fill:#0b2b5f!important;color:#0b2b5f!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"] *,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"] input,
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-testid="stDateInput"] input {
+    color:#ffdf45!important;
+    -webkit-text-fill-color:#ffdf45!important;
+    opacity:1!important;
+    font-weight:800!important;
+}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"],
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_eta_range"] [data-baseweb="input"] > div {
+    background:#122c50!important;
+}
 </style>'''
 
 def apply_theme():
