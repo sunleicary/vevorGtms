@@ -43,7 +43,7 @@ def _local_plan(question, suppliers):
         start=today.replace(day=1).isoformat()
         end=(today.replace(day=28)+timedelta(days=4)).replace(day=1).__sub__(timedelta(days=1)).isoformat()
     # Explicit year is mandatory for numeric date ranges to avoid ambiguous results.
-    matches=re.findall(r"(20\\d{2})[-/年](\\d{1,2})[-/月](\\d{1,2})",q)
+    matches=re.findall(r"(20\d{2})[-/年](\d{1,2})[-/月](\d{1,2})",q)
     if len(matches)>=2:
         start=date(*map(int,matches[0])).isoformat()
         end=date(*map(int,matches[1])).isoformat()
