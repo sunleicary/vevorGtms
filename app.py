@@ -273,7 +273,7 @@ if page == "数据管理":
         st.error("权限不足：仅管理员可访问数据管理及上传业务数据。")
         st.stop()
     st.subheader("业务数据管理")
-    st.caption("Neon 模式下上传将更新云端 PostgreSQL；SQLite 模式下仍使用实例本地文件。")
+    st.warning("当前使用 SQLite：Streamlit Cloud 实例本地文件不保证持久保存，重启或重新部署后可能丢失。请定期从「系统数据备份」下载备份。")
     if not is_neon() and not os.path.exists(DB):
         st.info("尚未导入业务数据。请先上传源文件。")
     else:
@@ -297,7 +297,7 @@ if page == "数据管理":
     st.stop()
 
 if not is_neon() and not os.path.exists(DB):
-    st.warning("云端尚无业务数据库。请联系管理员在「数据管理」上传全球完整源文件。")
+    st.warning("当前 SQLite 尚无业务数据库。请管理员进入「业务数据导入管理」上传原始业务数据。")
     st.stop()
 
 df = read_db("neon" if is_neon() else os.path.getmtime(DB))
