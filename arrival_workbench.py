@@ -51,7 +51,7 @@ def summarize(z, actual):
 def show_arrival_workbench(frame):
     today=pd.Timestamp(date.today())
     actual,future,overdue,missing=build_arrivals(frame,today)
-    st.title("港口与铁路到站动态指挥中心")
+    st.title("港口与铁路到站动态监控中心")
     st.caption(f"实际到港/站：{(today-pd.Timedelta(days=14)).date()} 至 {today.date()} ｜ 预计：{today.date()} 至 {(today+pd.Timedelta(days=14)).date()}。独立滚动窗口，沿用左侧区域与供应商，不受左侧ETA筛选截断。")
     st.warning("仅统计本企业业务柜（排柜单号），不是整船载箱量。铁路站口、铁路承运人、铁路班次缺失时不推断；铁路到站预测使用目的港预计卸柜时间或明确到站时间，不使用海运ETA。")
     a,b,c,d,e=st.columns(5)
