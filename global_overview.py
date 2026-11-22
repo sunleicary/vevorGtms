@@ -50,7 +50,7 @@ def _prepare(df):
     z.loc[z["港后供应商"].isin(["", "nan", "None", "港后拖车测试"]), "港后供应商"] = "待分配/未记录"
     for field in ("ETA日期", "ATA日期", "LFD", "进口实际提箱时间", "实际送仓时间", "实际还柜日期"):
         z[field + "_dt"] = pd.to_datetime(z[field], errors="coerce", format="mixed")
-    z["统计日期_dt"] = z["ETA日期_dt"].fillna(pd.to_datetime(z.get("目的港预计卸柜时间", pd.Series("", index=z.index)), errors="coerce", format="mixed"))
+    z["统计日期_dt"] = z["ETA日期_dt"].fillna(pd.to_datetime(z.get("目的港预计卸柜时间", pd.Series("", index=z.index)), errors="coerce", format="mixed")).fillna(pd.to_datetime(z.get("ETA（计算）", z.get("ETA(计算)", pd.Series("", index=z.index))), errors="coerce", format="mixed"))
     z["已到港"] = z["ATA日期_dt"].dt.normalize().le(pd.Timestamp(date.today()))
     z["已卸柜"] = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").dt.normalize().le(pd.Timestamp(date.today()))
     z["已提柜"] = z["进口实际提箱时间_dt"].notna()
@@ -111,7 +111,7 @@ def show_global_overview(df):
             yr = st.selectbox("ETA年份", years, index=years.index(2026) if 2026 in years else 0, key="global_year")
         else:
             yr = None
-            st.caption("沿用左侧筛选；统计日期优先 ETA，缺失取预计卸柜时间")
+            st.caption("沿用左侧筛选；统计日期：ETA日期 → 目的港预计卸柜时间 → ETA（计算）")
     with f3:
         if yr is not None:
             dates = st.date_input("统计日期区间", (date(yr, 1, 1), date(yr, 12, 31)),
