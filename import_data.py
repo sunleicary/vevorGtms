@@ -9,7 +9,7 @@ FIELDS = ["排柜单号","目的仓","实际送货仓","目的仓物流区域","
           "货代","清关行","港前拖车行","卸货港","卸货码头","目的港码头","码头","Terminal","目的地","船公司","实际船名","实际航次","ETA日期",
           "箱号","MB/L No.","港后拖车行","LFD","海关放行时间","清关完成时间",
           "进口实际提箱时间","约仓时间","实际送仓时间","实际到海外仓日期",
-          "实际还柜日期","预计还柜时间","进口查验开始日期","进口查验完成日期","港后内部备注"]
+          "实际还柜日期","预计还柜时间","进口查验开始日期","进口查验完成日期","港后内部备注","ATD日期","卸货港ETA日期","卸货港ATA日期","ETDDATE"]
 
 def load(path):
     # Import into a temporary DB first; never destroy the existing database on failure.
@@ -82,7 +82,8 @@ def load(path):
             with sqlite3.connect(temp_db) as source:
                 source.row_factory = sqlite3.Row
                 with db_connect(DB) as target:
-                    target.execute('ALTER TABLE containers ADD COLUMN IF NOT EXISTS "目的港预计卸柜时间" TEXT')
+                    for field in ("目的港预计卸柜时间", "ATD日期", "卸货港ETA日期", "卸货港ATA日期", "ETDDATE"):
+                        target.execute('ALTER TABLE containers ADD COLUMN IF NOT EXISTS "' + field + '" TEXT')
                     target.execute("DELETE FROM containers")
                     quoted = ", ".join('"' + c.replace('"', '""') + '"' for c in FIELDS)
                     statement = "INSERT INTO containers (id, " + quoted + ") VALUES (" + ",".join(["?"] * (len(FIELDS) + 1)) + ")"
