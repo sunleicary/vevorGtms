@@ -322,8 +322,8 @@ if "ETA（计算）" not in df and "ETA(计算)" not in df:
 df["统计日期_dt"] = df["ETA日期_dt"].fillna(pd.to_datetime(df["目的港预计卸柜时间"], errors="coerce", format="mixed")).fillna(pd.to_datetime(df.get("ETA（计算）", df.get("ETA(计算)", pd.Series("", index=df.index))), errors="coerce", format="mixed"))
 # Shared sidebar filters for operational reports. Always use post-port supplier field.
 # The date range is inclusive; missing/invalid ETA is excluded only when a range is enabled.
-with st.sidebar:
-    st.markdown("### 运营数据筛选")
+with st.container(border=True):
+    filter_region, filter_supplier, filter_date, filter_toggle = st.columns([1.2,1.6,1.5,0.8])
     # Keep a global option, but default to all US destinations.
     us_mask = df["目的仓国家"].map(is_us_country)
     country_names = df["目的仓国家"].fillna("").astype(str).str.strip()
@@ -338,7 +338,7 @@ with st.sidebar:
     region_options = ["美国所有区域", "全球所有区域"] + sorted(
         set(df["运营区域选项"].dropna().tolist()) - {"美国所有区域", "全球所有区域"}
     )
-    selected_region = st.selectbox("运营区域", region_options, key="gtms_filter_region")
+    selected_region = filter_region.selectbox("运营区域", region_options, key="gtms_filter_region")
     if selected_region == "美国所有区域":
         scope = df.loc[us_mask]
     elif selected_region == "全球所有区域":
@@ -352,14 +352,14 @@ with st.sidebar:
     supplier_choices = ["美国所有拖车商" if selected_region == "美国所有区域" else "全部拖车商"] + supplier_options
     if st.session_state.get("gtms_filter_supplier") not in supplier_choices:
         st.session_state["gtms_filter_supplier"] = supplier_choices[0]
-    selected_supplier = st.selectbox("港后拖车商", supplier_choices, key="gtms_filter_supplier")
-    eta_enabled = st.checkbox("启用 ETA 范围筛选", value=True, key="gtms_filter_eta_enabled")
+    selected_supplier = filter_supplier.selectbox("港后拖车商", supplier_choices, key="gtms_filter_supplier")
+    eta_enabled = filter_toggle.checkbox("启用 ETA 范围筛选", value=True, key="gtms_filter_eta_enabled")
     eta_range = None
     if eta_enabled:
         today_filter = date.today()
         start_default = today_filter - timedelta(days=14)
         end_default = today_filter + timedelta(days=14)
-        eta_range = st.date_input("ETA范围（含起止日）", value=(start_default, end_default),
+        eta_range = filter_date.date_input("ETA范围（含起止日）", value=(start_default, end_default),
                                   key="gtms_filter_eta_range")
 # Apply geographic scope first, then supplier and inclusive ETA.
 df = scope.copy()
@@ -422,7 +422,7 @@ elif page == "运营总览":
         with tab:
             z = q if name is None else q[q["区域"] == name]
             st.subheader(name or "美国港后运营总览")
-            st.caption("统计范围：遵循左侧日期筛选（ETA日期 → 目的港预计卸柜时间 → ETA（计算））")
+            st.caption("统计范围：遵循顶部日期筛选（ETA日期 → 目的港预计卸柜时间 → ETA（计算））")
             arrived = z["ATA日期_dt"].dt.normalize().le(today)
             discharged = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").dt.normalize().le(today)
             picked = z["进口实际提箱时间_dt"].notna()
@@ -443,10 +443,10 @@ elif page == "运营总览":
             for metric_idx, (col, (label, mask)) in enumerate(zip(st.columns(len(metric_masks)), metric_masks)):
                 count = int(mask.sum())
                 with col:
-                    st.caption(label)
+                    st.markdown(f'<div class="gtms-kpi-label">{label}</div>', unsafe_allow_html=True)
                     if st.button(f"{count:,}", key=f"overview_metric_{i}_{metric_idx}",
                                  help=f"点击查看「{label}」的 {count:,} 条货柜记录",
-                                 disabled=count == 0):
+                                 disabled=count == 0, use_container_width=True):
                         st.session_state[selected_metric_key] = (
                             None if st.session_state.get(selected_metric_key) == metric_idx else metric_idx
                         )
@@ -491,18 +491,19 @@ elif page == "运营总览":
                     ).round(1)
                     vendor_alerts = vendor_alerts.sort_values(
                         ["预警合计", "区域内供应商总柜量"], ascending=False).reset_index()
-                    st.dataframe(vendor_alerts, hide_index=True, use_container_width=True)
-                    st.download_button("导出该区域供应商LFD预警汇总 CSV",
+                    table_col, chart_col = st.columns([3,2])
+                    table_col.dataframe(vendor_alerts, hide_index=True, use_container_width=True, height=min(340, 38+35*len(vendor_alerts)))
+                    table_col.download_button("导出该区域供应商LFD预警汇总 CSV",
                         vendor_alerts.to_csv(index=False).encode("utf-8-sig"),
                         file_name=f"港后供应商LFD预警_{i}.csv", mime="text/csv",
                         key=f"overview_vendor_lfd_export_{i}")
                     warning_rows = alert_data[alert_data["是否LFD预警"]]
                     if not warning_rows.empty:
-                        st.markdown("##### 各供应商 LFD 预警柜量")
+                        chart_col.markdown("##### 各供应商 LFD 预警柜量")
                         plot = vendor_alerts.set_index("港后供应商")[
                             ["LFD已过待核实", "LFD三天内", "提箱晚于LFD"]]
-                        st.bar_chart(plot, horizontal=True,
-                                     height=max(260, min(650, len(plot) * 32)))
+                        chart_col.bar_chart(plot, horizontal=True, color=["#ba3c43","#d99b31","#547ca5"],
+                                     height=max(190, min(320, len(plot) * 28)))
                         with st.expander("🔎 按供应商查看 LFD 预警货柜明细", expanded=False):
                             suppliers = vendor_alerts.loc[
                                 vendor_alerts["预警合计"] > 0, "港后供应商"].tolist()
@@ -529,7 +530,7 @@ elif page == "运营总览":
                     if volume.empty:
                         st.info("当前范围内暂无货柜记录")
                     else:
-                        st.bar_chart(volume, horizontal=True, height=350,
+                        st.bar_chart(volume, horizontal=True, height=240,
                                      x_label="柜量", y_label="运营区域")
             with chart_right:
                 with st.container(border=True):
@@ -568,7 +569,7 @@ elif page == "运营总览":
                         }
                         st.vega_lite_chart({
                             "data": {"values": chart_rows.to_dict("records")},
-                            "height": 290,
+                            "height": 220,
                             "layer": [
                                 {"mark": {"type": "bar", "cornerRadiusEnd": 2},
                                  "encoding": base_encoding},
@@ -587,7 +588,7 @@ elif page == "运营总览":
                         }, use_container_width=True, key=f"overview_supplier_share_{i}")
                         st.caption("色块显示柜量与占比；占比不足13%的色块请悬停查看，避免标签重叠。")
             if not z.empty:
-                with st.expander("🔎 区域柜量及港后拖车商占比 · 条件查询", expanded=True):
+                with st.expander("🔎 区域柜量及港后拖车商占比 · 条件查询", expanded=False):
                     st.caption("在当前 ETA、区域和拖车商全局筛选范围内进一步查询；占比以所选区域的全部货柜为分母。")
                     query_data = z[["区域", "港后拖车行"]].copy()
                     query_data["港后拖车商"] = query_data["港后拖车行"].fillna("").astype(str).str.strip()
