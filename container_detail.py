@@ -46,7 +46,7 @@ def show_container_detail(data):
         v = row.get(field, "")
         return "—" if pd.isna(v) or str(v).strip() in ("", "nan", "NaT", "None") else str(v)
     st.markdown(f'<div style="font-size:18px;font-weight:700;line-height:1.4;margin:4px 0 10px">货柜 {escape(val("柜号显示"))} <span style="font-size:11px;font-weight:500;color:#64748b"> · {escape(val("风险"))}</span></div>',unsafe_allow_html=True)
-    metrics=[("船公司","船公司"),("船名","实际船名"),("航次","实际航次"),("最终ETA","ETA日期"),("最终ATA","ATA日期"),("提柜LFD","LFD"),("目的仓","目的仓"),("港后拖车商","港后拖车行")]
+    metrics=[("船公司","船公司"),("船名","实际船名"),("航次","实际航次"),("最终ETA","ETA日期"),("最终ATA","ATA日期"),("提柜LFD","LFD"),("可提柜时间","可提柜时间"),("目的仓","目的仓"),("港后拖车商","港后拖车行")]
     cells=[]
     for label,field in metrics:
         cells.append(f'<div style="min-width:0;padding:9px 12px"><div style="font-size:11px;color:#64748b;margin-bottom:3px">{label}</div><div style="font-size:14px;color:#17324d;font-weight:600;overflow-wrap:anywhere;line-height:1.4">{escape(val(field))}</div></div>')
@@ -68,7 +68,7 @@ def show_container_detail(data):
     events=[("发船","ATD日期","ETDDATE"),("抵达海运港口","卸货港ATA日期","卸货港ETA日期")]
     if rail:
         events.append(("抵达铁路站场","ATA日期","ETA日期"))
-    events.extend([("目的港/站卸柜","目的港/站卸柜日期","目的港预计卸柜时间"),("提柜","进口实际提箱时间",None),("送仓",delivery,"约仓时间"),("还空","实际还柜日期",None)])
+    events.extend([("目的港/站卸柜","目的港/站卸柜日期","目的港预计卸柜时间"),("可提柜","可提柜时间",None),("提柜","进口实际提箱时间",None),("送仓",delivery,"约仓时间"),("还空","实际还柜日期",None)])
     def deadline_status(actual,limit):
         due=parsed(limit)
         if pd.isna(due):
@@ -82,7 +82,8 @@ def show_container_detail(data):
         return "今日截止" if delta==0 else f"距截止日 {-delta} 天"
     pickup_status=deadline_status("进口实际提箱时间","LFD")
     return_status=deadline_status("实际还柜日期","预计还柜时间")
-    completed=sum(valid(field) for _,field,_ in events)
+    tracked=[field for _,field,_ in events if field!="可提柜时间" or pd.notna(parsed(field))]
+    completed=sum(valid(field) for field in tracked)
     first=parsed("ATD日期")
     last=parsed("实际还柜日期") if valid("实际还柜日期") else today
     duration=(last.date()-first.date()).days if valid("ATD日期") else None
@@ -101,13 +102,15 @@ def show_container_detail(data):
             color,status="#b45309","实际日期异常"
         elif not done and pd.notna(planned):
             color,status=("#2563eb","预计完成") if planned.date()>=today.date() else ("#b45309","计划已过")
+        if field=="可提柜时间" and not done:
+            status="待确认" if pd.isna(actual) else "日期待核实"
         if elapsed is not None and elapsed<0:
             color,status="#dc2626","顺序异常"
         limit="LFD" if field=="进口实际提箱时间" else "预计还柜时间" if field=="实际还柜日期" else None
         risk=deadline_status(field,limit) if limit else ""
         if risk and (risk.startswith("超期") or risk.startswith("已过截止日")):
             color,status="#dc2626","超期"
-        icon=icons[i if rail or i<2 else i+1]
+        icon="M4 12 L10 18 L21 5 M3 3 H15 M3 3 V21 H21 V13" if field=="可提柜时间" else icons[{"ATD日期":0,"卸货港ATA日期":1,"ATA日期":2,"目的港/站卸柜日期":3,"进口实际提箱时间":4,"实际还柜日期":6}.get(field,5)]
         short={"抵达海运港口":"海运到港","抵达铁路站场":"铁路到站","目的港/站卸柜":"卸柜"}.get(name,name)
         actual_text=actual.strftime("%Y-%m-%d") if pd.notna(actual) else "—"
         plan_text=planned.strftime("%Y-%m-%d") if pd.notna(planned) else "—"
@@ -115,14 +118,16 @@ def show_container_detail(data):
         gap=f"间隔 {elapsed} 天" if elapsed is not None and elapsed>=0 else ""
         cards.append(f'<div style="flex:1;min-width:112px;text-align:center;position:relative;z-index:1;padding:0 3px"><div style="width:36px;height:36px;margin:auto;background:#fff;border:1.5px solid {color};border-radius:50%;display:flex;align-items:center;justify-content:center;color:{color}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{icon}"/></svg></div><div style="font-size:12px;font-weight:700;margin-top:6px;color:#17324d">{short}</div><div style="font-size:12px;font-weight:600;color:{color};margin-top:5px">{actual_text}</div><div style="font-size:11px;color:{color};margin-top:3px">{status}</div><div style="font-size:10px;color:#64748b;margin-top:5px">{escape(note)}</div><div style="font-size:10px;color:#64748b">{gap}</div></div>')
         records.append({"节点":name,"实际时间":shown(field),"实际来源":field,"计划时间":shown(plan) if plan else "—","截止日期":shown(limit) if limit else "—","状态":status,"超期判断":risk,"阶段耗时（天）":elapsed})
-        previous=actual if done else pd.NaT
+        if field!="可提柜时间" or done:
+            previous=actual if done else pd.NaT
     st.markdown('<div style="background:#f8fafc;border:1px solid #dbe3ec;border-top:3px solid #f97316;border-radius:12px;padding:14px 10px 12px;overflow-x:auto"><div style="display:flex;position:relative;min-width:'+str(len(events)*118)+'px"><div style="position:absolute;left:7%;right:7%;top:18px;height:1px;background:#cbd5e1"></div>'+''.join(cards)+'</div></div>',unsafe_allow_html=True)
-    stats=[("节点记录",f"{completed}/{len(events)}"),("累计耗时",f"{duration} 天" if duration is not None and duration>=0 else "待核实"),("提柜LFD",pickup_status),("还空截止",return_status)]
+    stats=[("节点记录",f"{completed}/{len(tracked)}"),("累计耗时",f"{duration} 天" if duration is not None and duration>=0 else "待核实"),("提柜LFD",shown("LFD")),("提柜时效",pickup_status),("还空截止",return_status)]
     cards2=[]
     for label,value in stats:
         color="#dc2626" if value.startswith(("超期","已过截止日")) else "#15803d" if value=="未超期" else "#17324d"
         cards2.append(f'<div style="padding:8px 12px;min-width:0"><div style="font-size:11px;color:#64748b">{label}</div><div style="font-size:14px;font-weight:600;color:{color};margin-top:3px;overflow-wrap:anywhere">{escape(value)}</div></div>')
     st.markdown('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:4px;background:#f8fafc;border:1px solid #dbe3ec;border-radius:8px">'+''.join(cards2)+'</div>',unsafe_allow_html=True)
+    st.caption("可提柜时间仅显示已记录的码头/铁路站场可提柜时间；缺失时待确认，不用卸柜或清关日期推算。无可提柜记录时不计入节点完成率。")
     st.caption("绿色：已记录 ｜ 蓝色：预计 ｜ 橙色：需核实 ｜ 红色：超期/异常 ｜ 灰色：未记录")
     with st.expander("展开完整节点日期及超期明细"):
         st.dataframe(pd.DataFrame(records),hide_index=True,use_container_width=True)
@@ -132,7 +137,7 @@ def show_container_detail(data):
     groups = [
         ("📦 货柜基础信息", ["箱号","排柜单号","MB/L No.","目的仓物流区域","目的仓","目的仓国家","货代"]),
         ("🚢 港前运输信息", ["船公司","实际船名","实际航次","ETDDATE","ATD日期","卸货港ETA日期","卸货港ATA日期","ETA日期","ATA日期","卸货港","港前拖车行"]),
-        ("⚓ 港后通关与放行", ["目的港/站卸柜日期","海关放行时间","清关完成时间","进口查验开始日期","进口查验完成日期","LFD"]),
+        ("⚓ 港后通关与放行", ["目的港/站卸柜日期","海关放行时间","清关完成时间","可提柜时间","进口查验开始日期","进口查验完成日期","LFD"]),
         ("🚚 港后拖车送仓", ["港后拖车行","进口实际提箱时间","约仓时间","实际送仓时间","实际到海外仓日期"]),
         ("📭 还空信息", ["预计还柜时间","实际还柜日期","港后内部备注"])]
     for i in range(0,len(groups),2):
