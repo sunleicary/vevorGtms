@@ -148,6 +148,24 @@ def build_vessel_alerts(rows, today, tolerance=1):
     return pd.DataFrame(result,columns=keys+["计划到港ETA","实际到港ATA","到港偏差天数","涉及柜量","船舶状态"]),missing_identity
 
 
+def vessel_port_groups(vessels):
+    port_groups=[
+        ("洛杉矶/长滩港",NODES["洛杉矶/长滩港"][2]),
+        ("纽约/新泽西港",NODES["纽约/新泽西港"][2]),
+        ("萨凡纳港",NODES["萨凡纳港"][2]),
+        ("休斯顿港",NODES["休斯顿港"][2]),
+    ]
+    port_names=vessels["卸货港"].fillna("").astype(str)
+    assigned=pd.Series(False,index=vessels.index)
+    groups=[]
+    for name,pattern in port_groups:
+        mask=port_names.str.contains(pattern,case=False,regex=True)&~assigned
+        groups.append((name,mask))
+        assigned |= mask
+    groups.append(("其他卸货港",~assigned))
+    return groups
+
+
 def build_carrier_share(rows):
     carriers = rows.get("船公司", pd.Series("", index=rows.index, dtype="object"))
     carriers = carriers.fillna("").astype(str).str.strip().str.upper()
@@ -206,20 +224,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     cols=st.columns(5)
     for c,(name,val) in zip(cols,[("全美总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("船舶异常航次",f"{len(vessel_risk):,}"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
         c.metric(name,val,help="按船司、船名、航次、卸货港去重；海运ATA或当前日期超过卸货港ETA一天。缺失或冲突日期单列待核实。" if name=="船舶异常航次" else None)
-    port_groups=[
-        ("洛杉矶/长滩港",NODES["洛杉矶/长滩港"][2]),
-        ("纽约/新泽西港",NODES["纽约/新泽西港"][2]),
-        ("萨凡纳港",NODES["萨凡纳港"][2]),
-        ("休斯顿港",NODES["休斯顿港"][2]),
-    ]
-    port_names=vessels["卸货港"].fillna("").astype(str)
-    assigned=pd.Series(False,index=vessels.index)
-    groups=[]
-    for name,pattern in port_groups:
-        mask=port_names.str.contains(pattern,case=False,regex=True)&~assigned
-        groups.append((name,mask))
-        assigned |= mask
-    groups.append(("其他卸货港",~assigned))
+    groups = vessel_port_groups(vessels)
     left,right=st.columns([2,1])
     with left:
         with st.container(border=True):
@@ -250,20 +255,59 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     with st.expander("节点统计与日期口径"):
         st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
         st.caption("在途含ETA已过但未记录到达的货柜；启用ETA筛选时，缺少ETA记录不计入地图总量。")
+    region_options = {
+        "🇺🇸 全美总览": None,
+        "🗽 新泽西 NJ": "纽约/新泽西港",
+        "🛳️ 萨凡纳 SAV": "萨凡纳港",
+        "⚓ 洛杉矶 LA/LB": "洛杉矶/长滩港",
+        "🚛 休斯顿 HOU": "休斯顿港",
+        "🚆 芝加哥 CHI": "芝加哥铁路站",
+        "🏭 亚特兰大 ATL": "亚特兰大铁路站",
+    }
+    st.markdown("""
+<style>
+.st-key-arrival_analysis_region [role="radiogroup"] {
+    flex-wrap: wrap;
+    gap: .5rem;
+    border-bottom: 1px solid rgba(128,128,128,.25);
+}
+.st-key-arrival_analysis_region [role="radiogroup"] label {
+    margin: 0;
+    padding: .45rem .35rem;
+    border-bottom: 2px solid transparent;
+}
+.st-key-arrival_analysis_region [role="radiogroup"] label:has(input:checked) {
+    color: #d93242;
+    border-bottom-color: #d93242;
+}
+.st-key-arrival_analysis_region label:has(input:checked) p {color: #d93242}
+</style>
+""", unsafe_allow_html=True)
+    region = st.radio(
+        "分析区域", list(region_options), horizontal=True,
+        label_visibility="collapsed", key="arrival_analysis_region",
+    )
+    node = region_options[region]
+    carrier_rows = z
+    if node is not None:
+        carrier_rows = z.loc[z["最终港/站"].eq(node)]
+        vessels, missing_identity = build_vessel_alerts(carrier_rows, today)
+        vessel_risk = vessels[vessels["船舶状态"].isin(["延误到港", "逾期未确认到港"])]
+        groups = vessel_port_groups(vessels)
+        confirmed = vessels["实际到港ATA"].notna() & vessels["船舶状态"].ne("数据待核实")
+        pending = vessels["船舶状态"].isin(["计划到港", "逾期未确认到港"])
     tab_plan, tab_vessel, tab_actual, tab_risk, tab_carrier = st.tabs(
         ["每日到港计划", "船舶与航次", "实际到港趋势", "异常监控", "航司占比"]
     )
     with tab_plan:
-        selected=st.selectbox("海运港口区域",["全美国"]+[name for name,_ in groups],key="arrival_vessel_plan_region")
-        scope_mask=pd.Series(True,index=vessels.index) if selected=="全美国" else dict(groups)[selected]
-        planned=vessels.loc[scope_mask & vessels["计划到港ETA"].notna()]
+        planned = vessels.loc[vessels["计划到港ETA"].notna()]
         if planned.empty:
             st.info("当前范围无有效船舶计划日期。")
         else:
             daily=planned.groupby("计划到港ETA").size().rename("计划到港航次")
             st.bar_chart(daily,height=240)
             st.dataframe(daily.reset_index(),hide_index=True,use_container_width=True)
-        st.caption("按海运卸货港ETA及去重挂靠航次统计；统计范围沿用侧栏ETA筛选。")
+        st.caption("按海运卸货港ETA及去重挂靠航次统计；统计范围沿用上方区域和侧栏筛选。")
     with tab_vessel:
         st.markdown("#### 单日集中到港监控")
         concentrated=[]
@@ -295,15 +339,13 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         else:
             st.info("当前范围无已确认到港航次。")
     with tab_risk:
-        st.markdown("#### 船舶到港异常航次（全美当前筛选）")
+        st.markdown("#### 船舶到港异常航次")
         st.caption(f"异常 {len(vessel_risk)} 航次 · 涉及 {int(vessel_risk['涉及柜量'].sum())} 柜 · 日期待核实 {int(vessels['船舶状态'].eq('数据待核实').sum())} 航次 · 缺少船舶识别字段 {missing_identity} 柜")
         st.dataframe(vessel_risk,hide_index=True,use_container_width=True)
         with st.expander("全部船舶到港状态（含数据待核实）"):
             st.dataframe(vessels,hide_index=True,use_container_width=True)
         st.download_button("下载异常航次 CSV",vessel_risk.to_csv(index=False).encode("utf-8-sig"),"vessel_alerts.csv","text/csv")
     with tab_carrier:
-        node = st.selectbox("最终港/站", ["全部港/站"] + labels, key="arrival_carrier_node")
-        carrier_rows = z if node == "全部港/站" else z.loc[z["最终港/站"].eq(node)]
         if carrier_rows.empty:
             st.info("当前筛选范围内无货柜记录。")
         else:
