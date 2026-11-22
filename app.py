@@ -85,7 +85,7 @@ with st.sidebar:
     # Five business domains; labels are kept separate from legacy handlers.
     navigation = {
         "港后运营管理": [
-            "港后运营工作台", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理",
+            "港后运营工作台", "港口与铁路到站动态监控中心", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理",
             "港后供应商产能与计划管理", "港后供应商绩效KPI管理",
         ],
         "港后拖车行结算管理": [
@@ -145,7 +145,6 @@ with st.sidebar:
     if module == "港后运营工作台":
         # Preserve all existing reporting functions inside the operations workbench.
         workbench_views = {
-            "港口与铁路到站动态": "港口与铁路到站动态",
             "运营总览": "运营总览",
             "全球港后运营总览": "全球港后运营总览",
             "全美港后供应商总览": "全美港后供应商总览",
@@ -369,7 +368,7 @@ with st.sidebar:
 df = scope.copy()
 if selected_supplier not in ("美国所有拖车商", "全部拖车商"):
     df = df[df["港后拖车行"].fillna("").astype(str).str.strip().eq(selected_supplier)].copy()
-if page == "港口与铁路到站动态":
+if page == "港口与铁路到站动态监控中心":
     show_arrival_workbench(df)
     st.stop()
 if eta_enabled:
