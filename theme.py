@@ -251,6 +251,16 @@ div[class*="st-key-overview_metric_"]:not([class*="close"]) button p strong {dis
 div[class*="st-key-overview_metric_"][class$="_3"] button strong {color:#ba3c43!important}
 div[class*="st-key-overview_metric_"][class$="_7"] button strong {color:#b47716!important}
 [data-testid="stTabs"] button[role="tab"] {min-height:36px!important;line-height:1.4!important}
+
+/* Remove hosted toolbar chrome while retaining sidebar navigation controls. */
+[data-testid="stToolbar"],[data-testid="stDecoration"] {display:none!important}
+[data-testid="stHeader"] {background:transparent!important;height:0!important;min-height:0!important;overflow:visible!important;pointer-events:none!important}
+[data-testid="stSidebarCollapsedControl"],[data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"] {pointer-events:auto!important}
+[data-testid="stMainBlockContainer"],.block-container {padding-top:12px!important}
+.stApp:has([data-testid="stSidebar"][aria-expanded="false"]) [data-testid="stMainBlockContainer"],
+.stApp:has([data-testid="stSidebarCollapsedControl"] button) [data-testid="stMainBlockContainer"] {padding-top:48px!important}
+[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {min-height:30px!important;height:30px!important}
+@media(max-width:700px){[data-testid="stMainBlockContainer"],.block-container{padding-top:48px!important}}
 </style>'''
 
 def _numbered_display(renderer):
