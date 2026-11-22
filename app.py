@@ -85,7 +85,7 @@ with st.sidebar:
     # Five business domains; labels are kept separate from legacy handlers.
     navigation = {
         "港后运营管理": [
-            "港后运营工作台", "港口与铁路到站动态监控中心", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理",
+            "港后运营工作台", "港口与铁路到站动态监控中心", "货柜详细信息查询", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理",
             "港后供应商产能与计划管理", "港后供应商绩效KPI管理",
         ],
         "港后拖车行结算管理": [
@@ -131,6 +131,7 @@ with st.sidebar:
                     st.session_state["gtms_active_module"] = item
                     st.rerun()
     page_aliases = {
+        "货柜详细信息查询": "货柜详情",
         "用户管理": "用户管理",
         "拖车行主数据管理": "港前港后拖车供应商管理",
         "港后LFD智能预警管理": "🧠 智能运营中心｜LFD预警与催办",
