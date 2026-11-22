@@ -214,6 +214,28 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
 [data-testid="stSidebar"] [data-testid="stExpander"] .stButton button p {font-size:12px!important}
 div[class*="st-key-overview_metric_"] button p {font-size:19px!important}
 @media(max-width:700px){[data-testid="stMainBlockContainer"],.block-container{padding:2.5rem .65rem 1rem!important}}
+ 
+/* Lightning-inspired workspace */
+.stApp {background:#eef2f7}
+[data-testid="stSidebar"] {background:#fff!important;border-right:1px solid #d8e0eb!important;color:#243b53}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p {color:#243b53!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {background:#edf3fa!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button {color:#425b76!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button:hover {background:#edf3fa!important;color:#165da8!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button[kind="primary"] {background:#e5effc!important;color:#145ca8!important;border-left:3px solid #1764ad!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button[kind="primary"]:hover {background:#dbe9fa!important}
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] {border-left-color:#dce5ef!important}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {color:#52677e!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary svg {color:#52677e!important}
+[data-testid="stSidebar"] .vevor-sidebar-logo {color:#ff5418!important;margin:0 0 5px!important;padding:2px 8px!important}
+[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] > div[style*="border"] {background:white;border-color:#d7e0eb!important}
+.gtms-kpi-label {font-size:11px;color:#52677e;line-height:1.4;min-height:30px;display:flex;align-items:end}
+div[class*="st-key-overview_metric_"] button {width:100%!important;min-height:48px!important;border-radius:6px!important;background:#fff!important;box-shadow:none!important;border:1px solid #d8e2ee!important;border-top:2px solid #1764ad!important;justify-content:flex-start!important;padding:6px 10px!important}
+div[class*="st-key-overview_metric_"] button p {font-size:20px!important;color:#17365a!important}
+div[class*="st-key-overview_metric_"][class$="_3"] button p {color:#ba3c43!important}
+div[class*="st-key-overview_metric_"][class$="_7"] button p {color:#b47716!important}
+[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {background:transparent!important;color:#1764ad!important}
+[data-testid="stTabs"] [data-baseweb="tab-list"] {background:#fff;border-radius:6px;padding:0 8px}
 </style>'''
 
 def _numbered_display(renderer):
