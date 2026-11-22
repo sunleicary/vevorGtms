@@ -186,6 +186,34 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
     -webkit-text-fill-color:#ffdf45!important;
     font-weight:800!important;
 }
+
+/* Compact desktop application layout; keep shared navigation and controls intact. */
+.stApp {background:#f3f6fa}
+[data-testid="stMainBlockContainer"],.block-container {max-width:none!important;padding:1.8rem 1.15rem 1rem!important}
+[data-testid="stMain"] [data-testid="stVerticalBlock"] {gap:.45rem}
+[data-testid="stMain"] h1 {font-size:20px!important;line-height:1.35!important;padding:.2rem 0!important}
+[data-testid="stMain"] h2 {font-size:18px!important;line-height:1.35!important;padding:.2rem 0!important}
+[data-testid="stMain"] h3,[data-testid="stMain"] h4,[data-testid="stMain"] h5 {font-size:14px!important;line-height:1.4!important;padding:.15rem 0!important}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] p,[data-testid="stMain"] [data-testid="stWidgetLabel"] p {font-size:13px;line-height:1.45;margin-bottom:.2rem}
+[data-testid="stMain"] [data-testid="stCaptionContainer"] p {font-size:11px!important;line-height:1.35}
+[data-testid="stMain"] [data-testid="stMetric"] {padding:7px 10px;border-radius:7px;border-top:2px solid #f97316;box-shadow:none;background:#fff}
+[data-testid="stMetricValue"],[data-testid="stMetricValue"] > div {font-size:20px!important;line-height:1.3!important}
+[data-testid="stMetricLabel"] p,[data-testid="stMetricDelta"] {font-size:11px!important}
+[data-testid="stMain"] [data-testid="stButton"] button,[data-testid="stMain"] [data-testid="stDownloadButton"] button {min-height:30px;padding:4px 10px;border-radius:6px}
+[data-testid="stMain"] [data-testid="stTabs"] button[role="tab"] {padding:6px 12px;font-size:13px}
+[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] > div[style*="border"] {border-radius:8px;box-shadow:none}
+[data-testid="stDataFrame"] {border-radius:6px}
+[data-testid="stMain"] table th,[data-testid="stMain"] table td {font-size:12px;padding:5px 8px}
+[data-testid="stMain"] hr {margin:.5rem 0}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap:.35rem}
+[data-testid="stSidebar"] [data-testid="stSidebarContent"] {padding-top:.5rem}
+[data-testid="stSidebar"] .vevor-sidebar-logo {padding:7px 10px;margin-bottom:3px;border:0!important;background:transparent!important;font-size:24px;color:#ff6428!important;letter-spacing:-1.5px}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {min-height:30px!important;padding:4px 8px!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button {min-height:28px!important;padding-top:3px!important;padding-bottom:3px!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p {font-size:13px!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] .stButton button p {font-size:12px!important}
+div[class*="st-key-overview_metric_"] button p {font-size:19px!important}
+@media(max-width:700px){[data-testid="stMainBlockContainer"],.block-container{padding:2.5rem .65rem 1rem!important}}
 </style>'''
 
 def _numbered_display(renderer):
