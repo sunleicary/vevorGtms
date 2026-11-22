@@ -148,6 +148,14 @@ def build_vessel_alerts(rows, today, tolerance=1):
     return pd.DataFrame(result,columns=keys+["计划到港ETA","实际到港ATA","到港偏差天数","涉及柜量","船舶状态"]),missing_identity
 
 
+def default_arrival_eta_range(today):
+    today = pd.Timestamp(today)
+    return (
+        (today - pd.Timedelta(weeks=2)).date(),
+        (today + pd.DateOffset(months=2)).date(),
+    )
+
+
 def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     today=pd.Timestamp(date.today())
     all_rows=build_arrivals(frame,today)
@@ -164,7 +172,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
 </style><div class="arrival-page-title">港口与铁路到站动态监控中心</div>""",unsafe_allow_html=True)
     if eta_enabled:
         if eta_range is None:
-            eta_range=((today-pd.Timedelta(days=14)).date(),(today+pd.Timedelta(days=14)).date())
+            eta_range = default_arrival_eta_range(today)
         if len(eta_range)!=2:
             st.info("请选择完整的 ETA 起止日期。")
             return

@@ -27,7 +27,7 @@ from drayage_master import show_drayage_master
 from postport_do_assignment import show_do_assignment
 from contract_rates import show_contract_rates
 from logistics_ai import show_logistics_ai
-from arrival_workbench import show_arrival_workbench
+from arrival_workbench import default_arrival_eta_range, show_arrival_workbench
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -358,10 +358,13 @@ with st.sidebar:
     eta_range = None
     if eta_enabled:
         today_filter = date.today()
-        start_default = today_filter - timedelta(days=14)
-        end_default = today_filter + timedelta(days=14)
-        eta_range = st.date_input("ETA范围（含起止日）", value=(start_default, end_default),
-                                  key="gtms_filter_eta_range")
+        if page == "港口与铁路到站动态监控中心":
+            default_eta_range = default_arrival_eta_range(today_filter)
+            eta_range_key = "gtms_arrival_eta_range"
+        else:
+            default_eta_range = (today_filter - timedelta(days=14), today_filter + timedelta(days=14))
+            eta_range_key = "gtms_filter_eta_range"
+        eta_range = st.date_input("ETA范围（含起止日）", value=default_eta_range, key=eta_range_key)
 # Apply geographic scope first, then supplier and inclusive ETA.
 df = scope.copy()
 if selected_supplier not in ("美国所有拖车商", "全部拖车商"):
