@@ -76,7 +76,7 @@ user = login_gate()
 with st.sidebar:
     st.markdown('<div class="vevor-sidebar-logo">VEVOR®</div>', unsafe_allow_html=True)
     st.caption(f'{user["username"]} · {user["role"]}')
-    # Five business domains; labels are kept separate from legacy handlers.
+    # Business domains; labels are kept separate from legacy handlers.
     navigation = {
         "港后运营管理": [
             "港后运营工作台", "港口与铁路到站动态监控中心", "货柜详细信息查询", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理",
@@ -89,16 +89,15 @@ with st.sidebar:
             "全球国家与业务区域管理", "全球港口与码头管理",
             "船司管理", "清关行管理", "海外仓主数据管理", "拖车行主数据管理",
         ],
-        "权限管理": ["角色管理", "用户管理"],
-        "系统管理": ["系统数据备份", "业务数据导入管理", "数据库连接状态管理"],
+        "系统管理": ["角色管理", "用户管理", "系统数据备份", "业务数据导入管理", "数据库连接状态管理"],
     }
     allowed_modules = permitted_modules(user)
     visible_domains = [domain for domain in navigation if any(item in allowed_modules for item in navigation[domain])]
     # Tree navigation: expand/collapse first-level groups and click child pages.
     icons = {
         "港后运营管理": "01", "港后拖车行结算管理": "02",
-        "企业主数据管理": "03", "权限管理": "04",
-        "系统管理": "05",
+        "企业主数据管理": "03",
+        "系统管理": "04",
     }
     available_modules = [item for group in visible_domains for item in navigation[group] if item in allowed_modules]
     if not available_modules:

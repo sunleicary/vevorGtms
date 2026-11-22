@@ -18,8 +18,7 @@ MODULES = {
     "港后运营管理": ["港后运营工作台", "港口与铁路到站动态监控中心", "货柜详细信息查询", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理", "港后供应商产能与计划管理", "港后供应商绩效KPI管理"],
     "港后拖车行结算管理": ["拖车行合同管理", "拖车行异常费用管理", "账期与费用结算管理"],
     "企业主数据管理": ["全球国家与业务区域管理", "全球港口与码头管理", "船司管理", "清关行管理", "海外仓主数据管理", "拖车行主数据管理"],
-    "权限管理": ["角色管理", "用户管理"],
-    "系统管理": ["系统数据备份", "业务数据导入管理", "数据库连接状态管理"],
+    "系统管理": ["角色管理", "用户管理", "系统数据备份", "业务数据导入管理", "数据库连接状态管理"],
 }
 ALL_MODULES = [name for group in MODULES.values() for name in group]
 DEFAULT_PERMISSIONS = {
@@ -80,7 +79,7 @@ def manage_roles(user):
             st.markdown("**" + group + "**")
             for module in modules:
                 allowed = (role, module) in grants
-                locked = role == "系统管理员" or role in ("港后拖车商", "海外仓运营人员") or group in ("权限管理", "系统管理")
+                locked = role == "系统管理员" or role in ("港后拖车商", "海外仓运营人员") or group == "系统管理"
                 if st.checkbox(module, value=allowed or role == "系统管理员", disabled=locked, key="role_" + role + "_" + module):
                     chosen.append(module)
         save = st.form_submit_button("保存角色权限", disabled=role == "系统管理员" or role in ("港后拖车商", "海外仓运营人员"))
@@ -88,7 +87,7 @@ def manage_roles(user):
         with _connect() as conn:
             conn.execute("DELETE FROM gtms_role_permissions WHERE role=?", (role,))
             for module in chosen:
-                if module not in MODULES["权限管理"] + MODULES["系统管理"]:
+                if module not in MODULES["系统管理"]:
                     conn.execute("INSERT INTO gtms_role_permissions (role, module) VALUES (?, ?)", (role, module))
         st.success("角色权限已保存。")
         st.rerun()
