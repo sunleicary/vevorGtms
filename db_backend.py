@@ -1,22 +1,11 @@
-"""Database access layer: opt-in Neon PostgreSQL with SQLite fallback.
-
-Set DATABASE_URL in Streamlit Secrets or the process environment.
-SQL written for SQLite uses ? parameters; the adapter translates them for psycopg.
-Never print the connection URL.
-"""
+"""SQLite-only database backend. Legacy DATABASE_URL is intentionally ignored."""
 import os
 import re
 import sqlite3
 
 def database_url():
-    value = os.environ.get("DATABASE_URL", "").strip()
-    if value:
-        return value
-    try:
-        import streamlit as st
-        return str(st.secrets.get("DATABASE_URL", "")).strip()
-    except Exception:
-        return ""
+    """Legacy API: disabled to prevent accidental PostgreSQL connections."""
+    return ""
 
 def is_neon():
     return bool(database_url())
@@ -99,10 +88,7 @@ class PgConnection:
             self.close()
 
 def connect(sqlite_path, timeout=30):
-    url = database_url()
-    if url:
-        import psycopg
-        return PgConnection(psycopg.connect(url, connect_timeout=15))
+    # Always use SQLite even if old Neon secrets remain configured.
     conn = sqlite3.connect(sqlite_path, timeout=timeout)
     conn.row_factory = sqlite3.Row
     return conn
