@@ -168,11 +168,22 @@ def current_user():
 
 
 def login_gate():
-    if not bootstrap():
+    try:
+        ready = bootstrap()
+        if ready:
+            ensure_roles()
+            user = current_user()
+    except (psycopg.OperationalError, sqlite3.OperationalError) as exc:
+        # Authentication must fail closed: never switch to a local credential DB.
+        # Do not render database URLs, usernames, or driver exception text.
+        st.error("登录服务暂时无法连接数据库，请稍后重试。")
+        st.info("请在 Streamlit Cloud 的应用日志中检查 PostgreSQL 连接失败原因，并核实 Neon 数据库状态、DATABASE_URL、SSL 和网络连接。")
+        if st.button("重新尝试连接数据库",key="auth_db_retry"):
+            st.rerun()
+        st.stop()
+    if not ready:
         st.error("尚未初始化管理员。请在 Streamlit Cloud → App settings → Secrets 配置长度至少 12 位的 ADMIN_PASSWORD。")
         st.stop()
-    ensure_roles()
-    user = current_user()
     if user:
         return user
     # Self-contained global logistics artwork; no external image requests.
