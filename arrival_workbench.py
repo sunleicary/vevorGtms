@@ -213,20 +213,18 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     with st.expander("节点统计与日期口径"):
         st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
         st.caption("在途含ETA已过但未记录到达的货柜；启用ETA筛选时，缺少ETA记录不计入地图总量。")
-    chosen=st.selectbox("最终港/站下钻",["全美国","六大港/站"]+labels,key="arrival_destination_filter")
-    detail=z if chosen=="全美国" else z[z["最终港/站"].isin(list(NODES))] if chosen=="六大港/站" else z[z["最终港/站"].eq(chosen)]
-    tab_plan,tab_vessel,tab_actual,tab_risk,tab_detail=st.tabs(["每日到港计划","船舶与航次","实际到达趋势","异常监控","货柜明细"])
+    tab_plan,tab_vessel,tab_actual,tab_risk=st.tabs(["每日到港计划","船舶与航次","实际到港趋势","异常监控"])
     with tab_plan:
-        days=pd.date_range(start,end)
-        daily=detail.groupby("统计日期").size().reindex(days,fill_value=0).rename("ETA柜量").to_frame()
-        daily["已到港/站（按ETA归组）"]=detail[detail["已到港/站"]].groupby("统计日期").size().reindex(days,fill_value=0)
-        st.bar_chart(daily[["ETA柜量"]],height=240)
-        st.caption("每日业务量按ETA归组，不代表实际当天到港或可提柜。实际到港状态按ATA判断。")
-        table=z.groupby(["统计日期","最终港/站"]).size().unstack(fill_value=0).reindex(index=days,columns=labels,fill_value=0)
-        table["全美"]=table.sum(axis=1)
-        table.index.name="ETA统计日期"
-        st.dataframe(table.reset_index(),hide_index=True,use_container_width=True)
-        st.download_button("下载每日柜量 CSV",table.to_csv().encode("utf-8-sig"),"daily_arrivals.csv","text/csv")
+        selected=st.selectbox("海运港口区域",["全美国"]+[name for name,_ in groups],key="arrival_vessel_plan_region")
+        scope_mask=pd.Series(True,index=vessels.index) if selected=="全美国" else dict(groups)[selected]
+        planned=vessels.loc[scope_mask & vessels["计划到港ETA"].notna()]
+        if planned.empty:
+            st.info("当前范围无有效船舶计划日期。")
+        else:
+            daily=planned.groupby("计划到港ETA").size().rename("计划到港航次")
+            st.bar_chart(daily,height=240)
+            st.dataframe(daily.reset_index(),hide_index=True,use_container_width=True)
+        st.caption("按海运卸货港ETA及去重挂靠航次统计；统计范围沿用侧栏ETA筛选。")
     with tab_vessel:
         st.markdown("#### 单日集中到港监控")
         concentrated=[]
@@ -250,10 +248,13 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
             st.success("当前统计周期内无单日多船集中到港预警")
         st.caption("按当前ETA筛选货柜范围、海运卸货港及卸货港ETA统计未确认到港的未来航次；单日2航次黄色，3航次及以上红色。日期待核实及已过原计划ETA的航次见异常监控。")
     with tab_actual:
-        st.subheader("实际到达趋势（同一ETA业务范围）")
-        actual=detail.loc[detail["已到港/站"]].groupby("实际到港/站").size()
+        st.markdown("#### 船舶实际到港趋势")
+        actual=vessels.loc[confirmed].groupby("实际到港ATA").size().rename("实际到港航次")
         if not actual.empty:
-            st.bar_chart(actual.rename("实际到港/站柜量"))
+            st.bar_chart(actual,height=240)
+            st.dataframe(actual.reset_index(),hide_index=True,use_container_width=True)
+        else:
+            st.info("当前范围无已确认到港航次。")
     with tab_risk:
         st.markdown("#### 船舶到港异常航次（全美当前筛选）")
         st.caption(f"异常 {len(vessel_risk)} 航次 · 涉及 {int(vessel_risk['涉及柜量'].sum())} 柜 · 日期待核实 {int(vessels['船舶状态'].eq('数据待核实').sum())} 航次 · 缺少船舶识别字段 {missing_identity} 柜")
@@ -261,19 +262,3 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         with st.expander("全部船舶到港状态（含数据待核实）"):
             st.dataframe(vessels,hide_index=True,use_container_width=True)
         st.download_button("下载异常航次 CSV",vessel_risk.to_csv(index=False).encode("utf-8-sig"),"vessel_alerts.csv","text/csv")
-        st.markdown("#### 最终港/站货柜到达异常")
-        risk=detail.loc[detail["逾期未记录到港"]]
-        st.metric("ETA已过未记录到达",len(risk))
-        st.dataframe(risk[[k for k in ["排柜单号","箱号","最终港/站","统计日期","港后拖车行","到港状态"] if k in risk]],hide_index=True,use_container_width=True)
-        st.caption("逾期表示需要核实，不等于确认未到达。")
-    with tab_detail:
-        st.subheader("货柜明细")
-        selected_status=st.selectbox("到港状态筛选",["全部（当前ETA范围）","已实际到港/站","预计到港/站","ETA已过，未记录到港","缺少ETA"],key="arrival_status_filter")
-        if selected_status=="缺少ETA":
-            detail=missing if chosen=="全美国" else missing[missing["最终港/站"].isin(list(NODES))] if chosen=="六大港/站" else missing[missing["最终港/站"].eq(chosen)]
-            st.caption("缺少ETA明细不受日期窗口限制。")
-        elif selected_status!="全部（当前ETA范围）":
-            detail=detail[detail["到港状态"].eq(selected_status)]
-        fields=[k for k in ["排柜单号","箱号","目的地","最终港/站","目的仓物流区域","统计日期","日期来源","到港状态","ETA日期","目的港预计卸柜时间","ETA（计算）","卸货港ETA日期","实际海运到港","实际到港/站","实际卸柜","港后拖车行","LFD","进口实际提箱时间","实际送仓时间","实际还柜日期"] if k in detail]
-        st.dataframe(detail[fields],hide_index=True,use_container_width=True)
-        st.download_button("下载货柜明细 CSV",detail[fields].to_csv(index=False).encode("utf-8-sig"),"arrival_details.csv","text/csv")
