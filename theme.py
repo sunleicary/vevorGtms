@@ -236,6 +236,22 @@ div[class*="st-key-overview_metric_"][class$="_3"] button p {color:#ba3c43!impor
 div[class*="st-key-overview_metric_"][class$="_7"] button p {color:#b47716!important}
 [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {background:transparent!important;color:#1764ad!important}
 [data-testid="stTabs"] [data-baseweb="tab-list"] {background:#fff;border-radius:6px;padding:0 8px}
+
+/* Fix header collision and KPI text layout. */
+[data-testid="stMainBlockContainer"],.block-container {padding-top:4rem!important}
+[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {padding:0 12px!important;min-height:40px!important;height:40px!important}
+[data-testid="stSidebar"] [data-testid="stSidebarContent"] {padding-top:0!important}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {padding-top:0!important}
+[data-testid="stSidebar"] .vevor-sidebar-logo {line-height:1.15!important;padding:0 8px!important;margin:0!important}
+[data-testid="stMain"] [data-testid="stVerticalBlock"] {gap:.65rem!important}
+[data-testid="stMain"] h1,[data-testid="stMain"] h2,[data-testid="stMain"] h3,[data-testid="stMain"] h4,[data-testid="stMain"] h5 {line-height:1.5!important;overflow:visible!important;padding:3px 0!important;margin:0!important}
+div[class*="st-key-overview_metric_"]:not([class*="close"]) button {height:auto!important;min-height:70px!important;align-items:center!important;justify-content:center!important;padding:8px 4px!important}
+div[class*="st-key-overview_metric_"]:not([class*="close"]) button [data-testid="stMarkdownContainer"] {width:100%;overflow:visible!important}
+div[class*="st-key-overview_metric_"]:not([class*="close"]) button p {font-size:11px!important;line-height:1.4!important;white-space:normal!important;overflow-wrap:anywhere!important;margin:0!important;text-align:center!important;color:#52677e!important}
+div[class*="st-key-overview_metric_"]:not([class*="close"]) button p strong {display:inline-block;font-size:20px!important;line-height:1.35!important;color:#17365a!important;margin-top:4px}
+div[class*="st-key-overview_metric_"][class$="_3"] button strong {color:#ba3c43!important}
+div[class*="st-key-overview_metric_"][class$="_7"] button strong {color:#b47716!important}
+[data-testid="stTabs"] button[role="tab"] {min-height:36px!important;line-height:1.4!important}
 </style>'''
 
 def _numbered_display(renderer):
