@@ -77,6 +77,42 @@ def render_schematic(summary):
             st.session_state["arrival_destination_filter"]=name
 
 
+
+def show_vessel_schedule(rows, today):
+    st.subheader("船舶到港与铁路到站计划")
+    st.caption("按目的仓物流区域统计，沿用左侧ETA、区域及港后拖车商筛选；不受上方最终港/站下钻影响。海运到港日期可能在统计窗口之外。")
+    v=rows.copy()
+    def clean(field):
+        return v.get(field,pd.Series("",index=v.index)).fillna("").astype(str).str.strip().replace("", "未记录")
+    for field in ["目的仓物流区域","卸货港","船公司","实际船名","实际航次"]:
+        v[field]=clean(field)
+    regions=v["目的仓物流区域"]
+    selected=st.selectbox("目的地海外仓区域",["全部海外仓区域"]+sorted(regions.unique().tolist()),key="vessel_warehouse_region")
+    if selected!="全部海外仓区域":
+        v=v.loc[regions.eq(selected)].copy()
+    rail=v["目的仓物流区域"].str.contains(r"芝加哥|亚特兰大|chicago|atlanta",case=False,regex=True)
+    date_fields=["卸货港ETA日期","卸货港ATA日期","目的港预计卸柜时间","目的港/站卸柜日期"]
+    for field in date_fields:
+        parsed=pd.to_datetime(v.get(field,pd.Series("",index=v.index)),errors="coerce",format="mixed").dt.normalize()
+        v[field]=parsed.dt.strftime("%Y-%m-%d").fillna("未记录")
+        if field in date_fields[2:]:
+            v.loc[~rail,field]="不适用"
+    v["海运到港状态"]="未记录实际到港"
+    v.loc[pd.to_datetime(v["卸货港ATA日期"],errors="coerce").le(today),"海运到港状态"]="已实际到港"
+    keys=["目的仓物流区域","船公司","实际船名","实际航次","卸货港"]+date_fields+["海运到港状态"]
+    schedule=v.groupby(keys,dropna=False)["排柜单号"].nunique().reset_index(name="柜量")
+    schedule["_sort"]=pd.to_datetime(schedule["卸货港ETA日期"],errors="coerce")
+    schedule["_actual_sort"]=pd.to_datetime(schedule["卸货港ATA日期"],errors="coerce")
+    schedule=schedule.sort_values(["目的仓物流区域","_sort","_actual_sort","船公司","实际船名","实际航次"],na_position="last").drop(columns=["_sort","_actual_sort"])
+    st.metric("当前海外仓区域业务柜量",f"{v['排柜单号'].nunique():,}")
+    st.caption("同一船名、航次、卸货港及日期组合汇总；日期不同则分行，避免用单一日期覆盖不同货柜。缺少船名、航次或港口的记录保留为未记录。")
+    st.dataframe(schedule,hide_index=True,use_container_width=True)
+    st.download_button("下载船舶到港与铁路到站计划 CSV",schedule.to_csv(index=False).encode("utf-8-sig"),"vessel_arrival_schedule.csv","text/csv")
+    with st.expander("查看船舶对应货柜明细"):
+        fields=["排柜单号","箱号"]+keys+["目的地","港后拖车行","统计日期"]
+        st.dataframe(v[[k for k in fields if k in v]],hide_index=True,use_container_width=True)
+        st.download_button("下载船舶货柜明细 CSV",v[[k for k in fields if k in v]].to_csv(index=False).encode("utf-8-sig"),"vessel_container_details.csv","text/csv")
+
 def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     today=pd.Timestamp(date.today())
     all_rows=build_arrivals(frame,today)
@@ -132,9 +168,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     actual=detail.loc[detail["已到港/站"]].groupby("实际到港/站").size()
     if not actual.empty:
         st.bar_chart(actual.rename("实际到港/站柜量"))
-    st.subheader("船公司与航次")
-    keys=[k for k in ["最终港/站","卸货港","船公司","实际船名","实际航次"] if k in detail]
-    st.dataframe(detail.groupby(keys,dropna=False).size().reset_index(name="柜量"),hide_index=True,use_container_width=True)
+    show_vessel_schedule(z,today)
     st.subheader("货柜明细")
     selected_status=st.selectbox("到港状态筛选",["全部（当前ETA范围）","已实际到港/站","预计到港/站","ETA已过，未记录到港","缺少ETA"],key="arrival_status_filter")
     if selected_status=="缺少ETA":
