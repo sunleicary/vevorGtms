@@ -65,12 +65,6 @@ def render_schematic(summary):
     deck=pdk.Deck(layers=[points,labels],initial_view_state=pdk.ViewState(latitude=38.8,longitude=-96.0,zoom=2.75,pitch=0,bearing=0),map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",map_provider="carto",tooltip=False)
     st.pydeck_chart(deck,use_container_width=True,height=320)
     st.caption("橙色：海运港口 · 蓝色：铁路站场；在途含逾期未确认到达货柜。")
-    for col,name in zip(st.columns(3),list(NODES)[:3]):
-        if col.button(name,key="arrival_map_"+name,use_container_width=True):
-            st.session_state["arrival_destination_filter"]=name
-    for col,name in zip(st.columns(3),list(NODES)[3:]):
-        if col.button(name,key="arrival_map_"+name,use_container_width=True):
-            st.session_state["arrival_destination_filter"]=name
 
 
 def show_vessel_schedule(rows, today):
