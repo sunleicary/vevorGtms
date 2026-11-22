@@ -118,7 +118,7 @@ def show_vessel_schedule(rows, today):
 def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     today=pd.Timestamp(date.today())
     all_rows=build_arrivals(frame,today)
-    st.title("港口与铁路到站动态监控中心")
+    st.subheader("港口与铁路到站动态监控中心")
     if eta_enabled:
         if eta_range is None:
             eta_range=((today-pd.Timedelta(days=14)).date(),(today+pd.Timedelta(days=14)).date())
@@ -132,7 +132,6 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         valid=z["统计日期"].dropna()
         start,end=(valid.min(),valid.max()) if not valid.empty else (today,today)
     st.caption(f"ETA统计窗口：{start.date()} 至 {end.date()}（含起止日）" if eta_enabled else "ETA不限（含缺失日期记录）")
-    st.caption("按目的地归属最终港/站，洛杉矶与长滩合并。美国业务按排柜单号去重后的数据；非实时码头状态。")
     flags=["已到港/站","预计到港/站","逾期未记录到港","缺少ETA且未记录到港","已卸柜","已提柜","已送仓","已还空"]
     labels=list(NODES)+["其他/待核实"]
     summary=z.groupby("最终港/站").agg(总柜量=("排柜单号","size"),**{k:(k,"sum") for k in flags}).reindex(labels,fill_value=0)
@@ -141,43 +140,61 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     if eta_enabled:
         summary["缺少ETA（窗口外单列）"]=missing.groupby("最终港/站").size().reindex(labels,fill_value=0)
         summary=summary.drop(columns="缺少ETA且未记录到港")
+    arrived=int(z["已到港/站"].sum())
     cols=st.columns(5)
-    for c,(name,val) in zip(cols,[("全美总柜量",len(z)),("六大港/站柜量",int(summary.loc[list(NODES),"总柜量"].sum())),("实际已到港/站",int(z["已到港/站"].sum())),("在途柜量",len(z)-int(z["已到港/站"].sum())),("其他/待核实",int(summary.loc["其他/待核实","总柜量"]))]):
-        c.metric(name,f"{val:,}")
-    st.caption(f"ETA直接取值 {int(z['日期来源'].eq('ETA日期').sum()):,}；预计卸柜兜底 {int(z['日期来源'].eq('目的港预计卸柜时间').sum()):,}；ETA（计算）兜底 {int(z['日期来源'].eq('ETA（计算）').sum()):,}；筛选前缺有效日期 {int(all_rows['统计日期'].isna().sum()):,}。")
-    st.subheader("到港状态分类")
-    status_cols=st.columns(4)
-    for c,(label,value) in zip(status_cols,[("已实际到港/站",z["已到港/站"].sum()),("预计到港/站",z["预计到港/站"].sum()),("ETA已过未记录到港",z["逾期未记录到港"].sum()),("缺少ETA（未记录到港）",len(missing))]):
-        c.metric(label,f"{int(value):,}")
-    st.caption("前三项受ETA筛选限制。缺少ETA且未记录到港按当前区域和港后拖车商筛选，不受日期窗口限制；启用ETA窗口时不计入地图及窗口总柜量。ETA今天到期仍列为预计到港，逾期仅表示需核实。")
-    st.subheader("美国六大港口与铁路站场运营地图")
-    render_schematic(summary)
-    st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
-    st.subheader("每日到港/站业务量趋势")
+    for c,(name,val) in zip(cols,[("全美总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("到达率",f"{arrived/len(z):.1%}" if len(z) else "—"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
+        c.metric(name,val)
+    left,right=st.columns([3,2])
+    with left:
+        with st.container(border=True):
+            st.markdown("#### 美国港口与铁路站场")
+            render_schematic(summary)
+    with right:
+        with st.container(border=True):
+            st.markdown("#### 各节点到达进度")
+            for name in summary.sort_values("总柜量",ascending=False).index:
+                total=int(summary.loc[name,"总柜量"])
+                done=int(summary.loc[name,"已到港/站"])
+                st.markdown(f"**{name}** · {done:,} / {total:,} 柜")
+                st.progress(done/total if total else 0)
+            st.caption(f"缺少ETA且未记录到达：{len(missing):,} 柜（不受日期窗口限制）")
+    with st.expander("节点统计与日期口径"):
+        st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
+        st.caption("在途含ETA已过但未记录到达的货柜；启用ETA筛选时，缺少ETA记录不计入地图总量。")
     chosen=st.selectbox("最终港/站下钻",["全美国","六大港/站"]+labels,key="arrival_destination_filter")
     detail=z if chosen=="全美国" else z[z["最终港/站"].isin(list(NODES))] if chosen=="六大港/站" else z[z["最终港/站"].eq(chosen)]
-    days=pd.date_range(start,end)
-    daily=detail.groupby("统计日期").size().reindex(days,fill_value=0).rename("ETA柜量").to_frame()
-    daily["已到港/站（按ETA归组）"]=detail[detail["已到港/站"]].groupby("统计日期").size().reindex(days,fill_value=0)
-    st.bar_chart(daily[["ETA柜量"]])
-    st.caption("每日业务量按ETA归组，不代表实际当天到港或可提柜。实际到港状态按ATA判断。")
-    table=z.groupby(["统计日期","最终港/站"]).size().unstack(fill_value=0).reindex(index=days,columns=labels,fill_value=0)
-    table["全美"]=table.sum(axis=1)
-    table.index.name="ETA统计日期"
-    st.dataframe(table.reset_index(),hide_index=True,use_container_width=True)
-    st.download_button("下载每日柜量 CSV",table.to_csv().encode("utf-8-sig"),"daily_arrivals.csv","text/csv")
-    st.subheader("实际到达趋势（同一ETA业务范围）")
-    actual=detail.loc[detail["已到港/站"]].groupby("实际到港/站").size()
-    if not actual.empty:
-        st.bar_chart(actual.rename("实际到港/站柜量"))
-    show_vessel_schedule(z,today)
-    st.subheader("货柜明细")
-    selected_status=st.selectbox("到港状态筛选",["全部（当前ETA范围）","已实际到港/站","预计到港/站","ETA已过，未记录到港","缺少ETA"],key="arrival_status_filter")
-    if selected_status=="缺少ETA":
-        detail=missing if chosen=="全美国" else missing[missing["最终港/站"].isin(list(NODES))] if chosen=="六大港/站" else missing[missing["最终港/站"].eq(chosen)]
-        st.caption("缺少ETA明细不受日期窗口限制。")
-    elif selected_status!="全部（当前ETA范围）":
-        detail=detail[detail["到港状态"].eq(selected_status)]
-    fields=[k for k in ["排柜单号","箱号","目的地","最终港/站","目的仓物流区域","统计日期","日期来源","到港状态","ETA日期","目的港预计卸柜时间","ETA（计算）","卸货港ETA日期","实际海运到港","实际到港/站","实际卸柜","港后拖车行","LFD","进口实际提箱时间","实际送仓时间","实际还柜日期"] if k in detail]
-    st.dataframe(detail[fields],hide_index=True,use_container_width=True)
-    st.download_button("下载货柜明细 CSV",detail[fields].to_csv(index=False).encode("utf-8-sig"),"arrival_details.csv","text/csv")
+    tab_plan,tab_vessel,tab_actual,tab_risk,tab_detail=st.tabs(["每日到港计划","船舶与航次","实际到达趋势","异常监控","货柜明细"])
+    with tab_plan:
+        days=pd.date_range(start,end)
+        daily=detail.groupby("统计日期").size().reindex(days,fill_value=0).rename("ETA柜量").to_frame()
+        daily["已到港/站（按ETA归组）"]=detail[detail["已到港/站"]].groupby("统计日期").size().reindex(days,fill_value=0)
+        st.bar_chart(daily[["ETA柜量"]],height=240)
+        st.caption("每日业务量按ETA归组，不代表实际当天到港或可提柜。实际到港状态按ATA判断。")
+        table=z.groupby(["统计日期","最终港/站"]).size().unstack(fill_value=0).reindex(index=days,columns=labels,fill_value=0)
+        table["全美"]=table.sum(axis=1)
+        table.index.name="ETA统计日期"
+        st.dataframe(table.reset_index(),hide_index=True,use_container_width=True)
+        st.download_button("下载每日柜量 CSV",table.to_csv().encode("utf-8-sig"),"daily_arrivals.csv","text/csv")
+    with tab_vessel:
+        show_vessel_schedule(z,today)
+    with tab_actual:
+        st.subheader("实际到达趋势（同一ETA业务范围）")
+        actual=detail.loc[detail["已到港/站"]].groupby("实际到港/站").size()
+        if not actual.empty:
+            st.bar_chart(actual.rename("实际到港/站柜量"))
+    with tab_risk:
+        risk=detail.loc[detail["逾期未记录到港"]]
+        st.metric("ETA已过未记录到达",len(risk))
+        st.dataframe(risk[[k for k in ["排柜单号","箱号","最终港/站","统计日期","港后拖车行","到港状态"] if k in risk]],hide_index=True,use_container_width=True)
+        st.caption("逾期表示需要核实，不等于确认未到达。")
+    with tab_detail:
+        st.subheader("货柜明细")
+        selected_status=st.selectbox("到港状态筛选",["全部（当前ETA范围）","已实际到港/站","预计到港/站","ETA已过，未记录到港","缺少ETA"],key="arrival_status_filter")
+        if selected_status=="缺少ETA":
+            detail=missing if chosen=="全美国" else missing[missing["最终港/站"].isin(list(NODES))] if chosen=="六大港/站" else missing[missing["最终港/站"].eq(chosen)]
+            st.caption("缺少ETA明细不受日期窗口限制。")
+        elif selected_status!="全部（当前ETA范围）":
+            detail=detail[detail["到港状态"].eq(selected_status)]
+        fields=[k for k in ["排柜单号","箱号","目的地","最终港/站","目的仓物流区域","统计日期","日期来源","到港状态","ETA日期","目的港预计卸柜时间","ETA（计算）","卸货港ETA日期","实际海运到港","实际到港/站","实际卸柜","港后拖车行","LFD","进口实际提箱时间","实际送仓时间","实际还柜日期"] if k in detail]
+        st.dataframe(detail[fields],hide_index=True,use_container_width=True)
+        st.download_button("下载货柜明细 CSV",detail[fields].to_csv(index=False).encode("utf-8-sig"),"arrival_details.csv","text/csv")
