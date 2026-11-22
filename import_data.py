@@ -82,8 +82,9 @@ def load(path):
             with sqlite3.connect(temp_db) as source:
                 source.row_factory = sqlite3.Row
                 with db_connect(DB) as target:
-                    for field in ("目的港预计卸柜时间", "ATD日期", "卸货港ETA日期", "卸货港ATA日期", "ETDDATE", "ETA（计算）"):
-                        target.execute('ALTER TABLE containers ADD COLUMN IF NOT EXISTS "' + field + '" TEXT')
+                    for field in FIELDS:
+                        quoted_field = '"' + field.replace('"', '""') + '"'
+                        target.execute("ALTER TABLE containers ADD COLUMN IF NOT EXISTS " + quoted_field + " TEXT")
                     target.execute("DELETE FROM containers")
                     quoted = ", ".join('"' + c.replace('"', '""') + '"' for c in FIELDS)
                     statement = "INSERT INTO containers (id, " + quoted + ") VALUES (" + ",".join(["?"] * (len(FIELDS) + 1)) + ")"
