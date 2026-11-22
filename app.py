@@ -322,9 +322,8 @@ if "ETA（计算）" not in df and "ETA(计算)" not in df:
 df["统计日期_dt"] = df["ETA日期_dt"].fillna(pd.to_datetime(df["目的港预计卸柜时间"], errors="coerce", format="mixed")).fillna(pd.to_datetime(df.get("ETA（计算）", df.get("ETA(计算)", pd.Series("", index=df.index))), errors="coerce", format="mixed"))
 # Shared sidebar filters for operational reports. Always use post-port supplier field.
 # The date range is inclusive; missing/invalid ETA is excluded only when a range is enabled.
-with st.container(border=True):
-    st.markdown("#### 运营数据筛选")
-    filter_region, filter_supplier, filter_date, filter_toggle = st.columns([1.2,1.6,1.5,0.8])
+with st.sidebar:
+    st.markdown('<div class="gtms-filter-title">运营数据筛选</div>', unsafe_allow_html=True)
     # Keep a global option, but default to all US destinations.
     us_mask = df["目的仓国家"].map(is_us_country)
     country_names = df["目的仓国家"].fillna("").astype(str).str.strip()
@@ -339,7 +338,7 @@ with st.container(border=True):
     region_options = ["美国所有区域", "全球所有区域"] + sorted(
         set(df["运营区域选项"].dropna().tolist()) - {"美国所有区域", "全球所有区域"}
     )
-    selected_region = filter_region.selectbox("运营区域", region_options, key="gtms_filter_region")
+    selected_region = st.selectbox("运营区域", region_options, key="gtms_filter_region")
     if selected_region == "美国所有区域":
         scope = df.loc[us_mask]
     elif selected_region == "全球所有区域":
@@ -353,14 +352,14 @@ with st.container(border=True):
     supplier_choices = ["美国所有拖车商" if selected_region == "美国所有区域" else "全部拖车商"] + supplier_options
     if st.session_state.get("gtms_filter_supplier") not in supplier_choices:
         st.session_state["gtms_filter_supplier"] = supplier_choices[0]
-    selected_supplier = filter_supplier.selectbox("港后拖车商", supplier_choices, key="gtms_filter_supplier")
-    eta_enabled = filter_toggle.checkbox("启用 ETA 范围筛选", value=True, key="gtms_filter_eta_enabled")
+    selected_supplier = st.selectbox("港后拖车商", supplier_choices, key="gtms_filter_supplier")
+    eta_enabled = st.checkbox("启用 ETA 范围筛选", value=True, key="gtms_filter_eta_enabled")
     eta_range = None
     if eta_enabled:
         today_filter = date.today()
         start_default = today_filter - timedelta(days=14)
         end_default = today_filter + timedelta(days=14)
-        eta_range = filter_date.date_input("ETA范围（含起止日）", value=(start_default, end_default),
+        eta_range = st.date_input("ETA范围（含起止日）", value=(start_default, end_default),
                                   key="gtms_filter_eta_range")
 # Apply geographic scope first, then supplier and inclusive ETA.
 df = scope.copy()
