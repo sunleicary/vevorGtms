@@ -49,35 +49,28 @@ def build_arrivals(frame, today):
 
 
 def render_schematic(summary):
-    """Static, responsive SVG; no basemap, network requests or map controls."""
-    layout = [
-        ("洛杉矶/长滩港","LA / LB",102,213,8,249,143),
-        ("纽约/新泽西港","NY / NJ",531,150,510,38,142),
-        ("萨凡纳港","SAV",459,253,510,278,142),
-        ("休斯顿港","HOU",328,283,233,328,146),
-        ("芝加哥铁路站","CHI",381,153,277,4,153),
-        ("亚特兰大铁路站","ATL",431,232,345,196,150),
-    ]
-    parts = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 420" role="img" aria-label="美国六大港口及铁路站场柜量示意图" style="width:100%;height:auto;display:block;font-family:Arial,Microsoft YaHei,sans-serif">',
-             '<rect width="660" height="420" rx="10" fill="#10243e"/>',
-             '<path d="M65 46 L122 60 L170 65 L218 69 L270 72 L306 73 L322 87 L350 77 L375 86 L388 108 L405 98 L419 113 L435 104 L452 128 L470 119 L484 99 L514 96 L537 72 L557 78 L562 105 L548 120 L532 126 L535 149 L517 166 L508 189 L490 204 L480 229 L461 248 L474 273 L491 303 L481 319 L466 311 L447 276 L425 257 L398 261 L379 250 L362 273 L340 271 L326 306 L317 338 L295 327 L280 300 L254 280 L229 286 L212 260 L183 251 L159 235 L128 230 L111 209 L91 198 L80 167 L64 144 L51 112 L58 86 Z" fill="#253e58" stroke="#607a96" stroke-width="1.5" transform="translate(10 20)"/>']
-    for name,code,x,y,bx,by,w in layout:
-        color = "#38bdf8" if code in ("CHI","ATL") else "#ff9a54"
-        parts.append(f'<path d="M{x} {y} L{bx+w/2} {by+40}" stroke="{color}" stroke-width="1.3" stroke-dasharray="3 3" fill="none"/><circle cx="{x}" cy="{y}" r="11" fill="{color}" opacity=".2"/><circle cx="{x}" cy="{y}" r="4.5" fill="{color}" stroke="white"/>')
-    for name,code,x,y,bx,by,w in layout:
-        color = "#38bdf8" if code in ("CHI","ATL") else "#ff9a54"
-        count = int(summary.loc[name,"总柜量"])
-        arrived = int(summary.loc[name,"已到港/站"])
-        transit = count-arrived
-        parts.append(f'<rect x="{bx}" y="{by}" width="{w}" height="80" rx="7" fill="#10243e" stroke="{color}"/><text x="{bx+9}" y="{by+17}" font-size="13" fill="#e2e8f0" font-weight="600">{name}</text><text x="{bx+9}" y="{by+35}" font-size="13" fill="#b5c8df">总柜量</text><text x="{bx+w-9}" y="{by+35}" text-anchor="end" font-size="13" fill="#e2e8f0" font-weight="bold">{count:,}</text><text x="{bx+9}" y="{by+53}" font-size="13" fill="#86efac">已到港/站</text><text x="{bx+w-9}" y="{by+53}" text-anchor="end" font-size="13" fill="#86efac" font-weight="bold">{arrived:,}</text><text x="{bx+9}" y="{by+70}" font-size="13" fill="#fdba74">在途</text><text x="{bx+w-9}" y="{by+70}" text-anchor="end" font-size="13" fill="#fdba74" font-weight="bold">{transit:,}</text>')
-    parts.append('</svg>')
-    st.markdown('<div style="max-width:1050px;margin:auto">'+''.join(parts)+'</div>',unsafe_allow_html=True)
-    st.caption("橙色：海运港群 ｜ 蓝色：铁路站场 ｜ 示意位置，非精确地理坐标。其他目的地单独统计。")
-    st.caption("在途＝总柜量－已到港/站（含ETA已过但未记录到达的货柜，非实时定位）。")
-    for col,name in zip(st.columns(6),NODES):
-        if col.button(name, key="arrival_map_"+name, use_container_width=True):
+    """Real geographic basemap; fixed-height map and screen-sized text."""
+    import pydeck as pdk
+    short={"洛杉矶/长滩港":"LA / LB","纽约/新泽西港":"NY / NJ","萨凡纳港":"SAV","休斯顿港":"HOU","芝加哥铁路站":"CHI","亚特兰大铁路站":"ATL"}
+    records=[]
+    for name,(lat,lon,_) in NODES.items():
+        total=int(summary.loc[name,"总柜量"])
+        arrived=int(summary.loc[name,"已到港/站"])
+        records.append({"name":name,"lat":lat,"lon":lon,"total":total,"arrived":arrived,"transit":total-arrived,
+                        "label":f"{short[name]}  {total:,}\\n已到 {arrived:,} / 在途 {total-arrived:,}",
+                        "color":[37,99,175,255] if name in ("芝加哥铁路站","亚特兰大铁路站") else [225,117,42,255],
+                        "offset":[-8,-27] if name=="萨凡纳港" else ([0,-26] if name!="亚特兰大铁路站" else [-34,23])})
+    points=pdk.Layer("ScatterplotLayer",records,get_position="[lon, lat]",get_fill_color="color",get_line_color=[255,255,255],get_radius=5,radius_units="pixels",stroked=True,line_width_min_pixels=1,pickable=True)
+    labels=pdk.Layer("TextLayer",records,get_position="[lon, lat]",get_text="label",get_size=14,size_units="pixels",get_color=[32,52,73],get_pixel_offset="offset",get_text_anchor="middle",get_alignment_baseline="center",background=True,get_background_color=[255,255,255,240],background_padding=[5,3],font_family="Arial, Microsoft YaHei, sans-serif",character_set="auto",font_settings={"sdf":False},pickable=False)
+    deck=pdk.Deck(layers=[points,labels],initial_view_state=pdk.ViewState(latitude=38.8,longitude=-96.0,zoom=2.75,pitch=0,bearing=0),map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",map_provider="carto",tooltip={"html":"<b>{name}</b><br/>总柜量：{total}<br/>已到港/站：{arrived}<br/>在途：{transit}","style":{"fontSize":"14px"}})
+    st.pydeck_chart(deck,use_container_width=True,height=320)
+    st.caption("橙色：海运港口 · 蓝色：铁路站场；在途含逾期未确认到达货柜。")
+    for col,name in zip(st.columns(3),list(NODES)[:3]):
+        if col.button(name,key="arrival_map_"+name,use_container_width=True):
             st.session_state["arrival_destination_filter"]=name
-
+    for col,name in zip(st.columns(3),list(NODES)[3:]):
+        if col.button(name,key="arrival_map_"+name,use_container_width=True):
+            st.session_state["arrival_destination_filter"]=name
 
 
 def show_vessel_schedule(rows, today):
