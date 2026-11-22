@@ -60,8 +60,8 @@ def render_schematic(summary):
                         "label":f"{name}\n总柜量  {total:,}\n已到港/站  {arrived:,}\n在途  {total-arrived:,}",
                         "color":[37,99,175,255] if name in ("芝加哥铁路站","亚特兰大铁路站") else [225,117,42,255],
                         "offset":offsets[name]})
-    points=pdk.Layer("ScatterplotLayer",records,get_position="[lon, lat]",get_fill_color="color",get_line_color=[255,255,255],get_radius=5,radius_units="pixels",stroked=True,line_width_min_pixels=1,pickable=False)
-    labels=pdk.Layer("TextLayer",records,get_position="[lon, lat]",get_text="label",get_size=14,size_units="pixels",get_color=[32,52,73,255],get_pixel_offset="offset",get_text_anchor="middle",get_alignment_baseline="center",background=True,get_background_color=[255,255,255,255],background_padding=[7,4],get_border_color=[190,204,218,255],get_border_width=1,font_family="Arial, Microsoft YaHei, sans-serif",character_set=list(dict.fromkeys("".join(row["label"] for row in records).replace("\n",""))),font_settings={"sdf":False},pickable=False)
+    points=pdk.Layer("ScatterplotLayer",records,get_position="[lon, lat]",get_fill_color="color",get_line_color=[255,255,255],get_radius=5,radius_units="'pixels'",stroked=True,line_width_min_pixels=1,pickable=False)
+    labels=pdk.Layer("TextLayer",records,get_position="[lon, lat]",get_text="label",get_size=14,size_units="'pixels'",get_color=[32,52,73,255],get_pixel_offset="offset",get_text_anchor="'middle'",get_alignment_baseline="'center'",background=True,get_background_color=[255,255,255,255],background_padding=[7,4],get_border_color=[190,204,218,255],get_border_width=1,font_family="'Arial, Microsoft YaHei, sans-serif'",character_set="'auto'",font_settings={"sdf":False},pickable=False)
     deck=pdk.Deck(layers=[points,labels],initial_view_state=pdk.ViewState(latitude=38.8,longitude=-96.0,zoom=2.75,pitch=0,bearing=0),map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",map_provider="carto",tooltip=False)
     st.pydeck_chart(deck,use_container_width=True,height=320)
     st.caption("橙色：海运港口 · 蓝色：铁路站场；在途含逾期未确认到达货柜。")
