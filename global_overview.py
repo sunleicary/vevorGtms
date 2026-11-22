@@ -51,7 +51,8 @@ def _prepare(df):
     for field in ("ETA日期", "ATA日期", "LFD", "进口实际提箱时间", "实际送仓时间", "实际还柜日期"):
         z[field + "_dt"] = pd.to_datetime(z[field], errors="coerce", format="mixed")
     z["统计日期_dt"] = z["ETA日期_dt"].fillna(pd.to_datetime(z.get("目的港预计卸柜时间", pd.Series("", index=z.index)), errors="coerce", format="mixed"))
-    z["已到港"] = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").notna()
+    z["已到港"] = z["ATA日期_dt"].dt.normalize().le(pd.Timestamp(date.today()))
+    z["已卸柜"] = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").dt.normalize().le(pd.Timestamp(date.today()))
     z["已提柜"] = z["进口实际提箱时间_dt"].notna()
     z["已送仓"] = z["实际送仓时间_dt"].notna()
     z["已还空"] = z["实际还柜日期_dt"].notna()
@@ -69,7 +70,7 @@ def _prepare(df):
 
 def _summary(z, by):
     keys = [by] if isinstance(by, str) else list(by)
-    measures = ["已到港", "已提柜", "已送仓", "已还空", "待提柜（已到港）",
+    measures = ["已到港", "已卸柜", "已提柜", "已送仓", "已还空", "待提柜（已到港）",
                 "待送仓（已提柜）", "待还空（已送仓）", "待分配",
                 "LFD超期待核实", "LFD三天内", "缺少ETA"]
     out = z.groupby(keys, dropna=False).agg(**{"总柜量": ("国家", "size"),
@@ -200,7 +201,7 @@ def show_global_overview(df):
             selected_region = st.selectbox("目的仓区域", ["全部区域"] + regions,
                                            key="global_detail_region_v3")
         scoped = z if selected_region == "全部区域" else z[z["区域"].eq(selected_region)]
-        statuses = ["全部", "已到港", "已提柜", "已送仓", "已还空",
+        statuses = ["全部", "已到港", "已卸柜", "已提柜", "已送仓", "已还空",
                     "待提柜（已到港）", "待送仓（已提柜）", "待还空（已送仓）",
                     "待分配", "LFD超期待核实", "LFD三天内", "缺少ETA"]
         with b:
