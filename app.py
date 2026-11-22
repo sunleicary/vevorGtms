@@ -370,7 +370,7 @@ df = scope.copy()
 if selected_supplier not in ("美国所有拖车商", "全部拖车商"):
     df = df[df["港后拖车行"].fillna("").astype(str).str.strip().eq(selected_supplier)].copy()
 if page == "港口与铁路到站动态监控中心":
-    show_arrival_workbench(df)
+    show_arrival_workbench(df, eta_range=eta_range, eta_enabled=eta_enabled)
     st.stop()
 if eta_enabled:
     if eta_range is not None and len(eta_range) == 2:
@@ -379,7 +379,7 @@ if eta_enabled:
     else:
         st.info("请选择完整的 ETA 起止日期。")
         st.stop()
-st.caption("统计日期：ETA优先，缺失取目的港预计卸柜时间；已到港/站以目的港/站卸柜日期为准。")
+st.caption("统计日期：ETA优先，缺失取目的港预计卸柜时间；最终到港/站以ATA日期为准；实际卸柜单独统计。")
 st.caption(f"当前运营筛选：{selected_region} · {selected_supplier} · "
            + (f"ETA {eta_range[0]} 至 {eta_range[1]}" if eta_enabled and eta_range and len(eta_range)==2 else "ETA不限")
            + f" · {len(df):,} 条业务记录")
@@ -427,13 +427,15 @@ elif page == "运营总览":
             z = q if name is None else q[q["区域"] == name]
             st.subheader(name or "美国港后运营总览")
             st.caption("统计范围：遵循左侧日期筛选（ETA优先，缺失取预计卸柜时间）")
-            arrived = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").notna()
+            arrived = z["ATA日期_dt"].dt.normalize().le(today)
+            discharged = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").dt.normalize().le(today)
             picked = z["进口实际提箱时间_dt"].notna()
             delivered = z["实际送仓时间_dt"].notna()
             returned = z["实际还柜日期_dt"].notna()
             metric_masks = [
                 ("货柜记录", pd.Series(True, index=z.index)),
                 ("已到港/站", arrived),
+                ("已卸柜", discharged),
                 ("LFD已过待核实", z["风险"].eq("LFD已过/提箱待核实")),
                 ("已提柜", picked),
                 ("已送仓", delivered),
@@ -442,7 +444,7 @@ elif page == "运营总览":
                 ("到港/站未记录提柜", arrived & ~picked),
             ]
             selected_metric_key = f"overview_selected_metric_{i}"
-            for metric_idx, (col, (label, mask)) in enumerate(zip(st.columns(8), metric_masks)):
+            for metric_idx, (col, (label, mask)) in enumerate(zip(st.columns(len(metric_masks)), metric_masks)):
                 count = int(mask.sum())
                 with col:
                     st.caption(label)
@@ -656,15 +658,15 @@ elif page == "运营总览":
                         candidate = ships[terminal_col].astype("string").str.strip().replace("", pd.NA)
                         ships["停靠码头"] = ships["停靠码头"].fillna(candidate)
                 ships["停靠码头"] = ships["停靠码头"].fillna("未记录")
-                ships["预计到港 ETA"] = ships["ETA日期_dt"].dt.strftime("%Y-%m-%d").fillna("未记录")
-                ships["实际到港 ATA"] = ships["ATA日期_dt"].dt.strftime("%Y-%m-%d").fillna("未记录")
+                ships["预计到港 ETA"] = pd.to_datetime(ships.get("卸货港ETA日期", pd.Series("", index=ships.index)), errors="coerce", format="mixed").dt.strftime("%Y-%m-%d").fillna("未记录")
+                ships["实际到港 ATA"] = pd.to_datetime(ships.get("卸货港ATA日期", pd.Series("", index=ships.index)), errors="coerce", format="mixed").dt.strftime("%Y-%m-%d").fillna("未记录")
                 discharge_dt = pd.to_datetime(
                     ships["目的港/站卸柜日期"], errors="coerce", format="mixed")
-                ships["卸柜日期"] = discharge_dt.dt.strftime("%Y-%m-%d").fillna("未记录")
+                ships["最终卸柜日期"] = discharge_dt.dt.strftime("%Y-%m-%d").fillna("未记录")
                 ships["船公司"] = ships["船公司"].fillna("").astype(str).str.strip().replace("", "未记录")
                 summary = (
                     ships.groupby(["船公司", "船舶/航次", "卸货港", "停靠码头",
-                                   "预计到港 ETA", "实际到港 ATA", "卸柜日期"],
+                                   "预计到港 ETA", "实际到港 ATA", "最终卸柜日期"],
                                   dropna=False)
                     .size().reset_index(name="柜量"))
                 summary["_sort_eta"] = pd.to_datetime(summary["预计到港 ETA"], errors="coerce")
