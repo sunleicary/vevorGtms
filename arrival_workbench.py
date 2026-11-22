@@ -69,7 +69,7 @@ def render_schematic(summary):
         count = int(summary.loc[name,"总柜量"])
         arrived = int(summary.loc[name,"已到港/站"])
         transit = count-arrived
-        parts.append(f'<rect x="{bx}" y="{by}" width="{w}" height="80" rx="7" fill="#10243e" stroke="{color}"/><text x="{bx+9}" y="{by+17}" font-size="12" fill="#e2e8f0" font-weight="600">{name}</text><text x="{bx+9}" y="{by+35}" font-size="10" fill="#b5c8df">总柜量</text><text x="{bx+w-9}" y="{by+35}" text-anchor="end" font-size="14" fill="#e2e8f0" font-weight="bold">{count:,}</text><text x="{bx+9}" y="{by+53}" font-size="10" fill="#86efac">已到港/站</text><text x="{bx+w-9}" y="{by+53}" text-anchor="end" font-size="14" fill="#86efac" font-weight="bold">{arrived:,}</text><text x="{bx+9}" y="{by+70}" font-size="10" fill="#fdba74">在途</text><text x="{bx+w-9}" y="{by+70}" text-anchor="end" font-size="14" fill="#fdba74" font-weight="bold">{transit:,}</text>')
+        parts.append(f'<rect x="{bx}" y="{by}" width="{w}" height="80" rx="7" fill="#10243e" stroke="{color}"/><text x="{bx+9}" y="{by+17}" font-size="13" fill="#e2e8f0" font-weight="600">{name}</text><text x="{bx+9}" y="{by+35}" font-size="13" fill="#b5c8df">总柜量</text><text x="{bx+w-9}" y="{by+35}" text-anchor="end" font-size="13" fill="#e2e8f0" font-weight="bold">{count:,}</text><text x="{bx+9}" y="{by+53}" font-size="13" fill="#86efac">已到港/站</text><text x="{bx+w-9}" y="{by+53}" text-anchor="end" font-size="13" fill="#86efac" font-weight="bold">{arrived:,}</text><text x="{bx+9}" y="{by+70}" font-size="13" fill="#fdba74">在途</text><text x="{bx+w-9}" y="{by+70}" text-anchor="end" font-size="13" fill="#fdba74" font-weight="bold">{transit:,}</text>')
     parts.append('</svg>')
     st.markdown('<div style="max-width:1050px;margin:auto">'+''.join(parts)+'</div>',unsafe_allow_html=True)
     st.caption("橙色：海运港群 ｜ 蓝色：铁路站场 ｜ 示意位置，非精确地理坐标。其他目的地单独统计。")
@@ -144,7 +144,17 @@ def build_vessel_alerts(rows, today, tolerance=1):
 def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     today=pd.Timestamp(date.today())
     all_rows=build_arrivals(frame,today)
-    st.subheader("港口与铁路到站动态监控中心")
+    st.markdown("""<style>
+[data-testid="stMain"]:has(.arrival-page-title) {font-size:14px}
+[data-testid="stMain"]:has(.arrival-page-title) :is(h1,h2,h3,h4,h5,h6,p,label,button,[role="tab"],[data-baseweb="select"],[data-baseweb="select"] span,[data-testid="stMetricValue"],[data-testid="stMetricValue"] div,[data-testid="stMetricLabel"] p,[data-testid="stCaptionContainer"] p) {font-size:14px!important;line-height:1.5!important}
+[data-testid="stMain"]:has(.arrival-page-title) .arrival-page-title {font-size:20px!important;font-weight:700;line-height:1.45;color:inherit;margin:0 0 4px}
+[data-testid="stMain"]:has(.arrival-page-title) [data-testid="stMetricValue"] {font-weight:700!important;min-height:22px!important}
+[data-testid="stMain"]:has(.arrival-page-title) [data-testid="stMetricLabel"] {min-height:22px!important}
+[data-testid="stMain"]:has(.arrival-page-title) [data-testid="stMetric"] {padding:8px 10px!important;border-radius:6px!important}
+[data-testid="stMain"]:has(.arrival-page-title) [data-testid="stVerticalBlock"] {gap:.5rem!important}
+[data-testid="stMain"]:has(.arrival-page-title) [data-testid="stTabs"] button {padding:6px 12px!important}
+[data-testid="stMain"]:has(.arrival-page-title) [data-testid="stCaptionContainer"] p {opacity:.85}
+</style><div class="arrival-page-title">港口与铁路到站动态监控中心</div>""",unsafe_allow_html=True)
     if eta_enabled:
         if eta_range is None:
             eta_range=((today-pd.Timedelta(days=14)).date(),(today+pd.Timedelta(days=14)).date())
