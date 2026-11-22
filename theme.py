@@ -1,5 +1,7 @@
 """Shared VEVOR-inspired visual theme for Streamlit pages."""
 import streamlit as st
+import pandas as pd
+from functools import wraps
 
 CSS = '''/* VEVOR V0.98-inspired visual system. Presentation only; no business logic. */
 <style>
@@ -186,5 +188,38 @@ div[class*="st-key-overview_metric_"] button:hover p {color:#f04e16!important}
 }
 </style>'''
 
+def _numbered_display(renderer):
+    @wraps(renderer)
+    def display(data=None, *args, **kwargs):
+        # Display-only; do not mutate source frames or selectable row positions.
+        if isinstance(data, pd.DataFrame) and not isinstance(data.columns, pd.MultiIndex):
+            data = data.copy()
+            if kwargs.get("hide_index") is not True and not isinstance(data.index, pd.RangeIndex):
+                index_frame = data.index.to_frame(index=False)
+                index_frame.columns = [str(n) if n is not None else f"索引{i+1}" for i,n in enumerate(data.index.names)]
+                for col in reversed(index_frame.columns.tolist()):
+                    if col not in data.columns:
+                        data.insert(0,col,index_frame[col].to_numpy())
+            if "序号" not in data.columns:
+                data.insert(0, "序号", pd.RangeIndex(1, len(data)+1).astype("int64"))
+            data = data.reset_index(drop=True)
+            if renderer.__name__ == "dataframe":
+                kwargs["hide_index"] = True
+                config = dict(kwargs.get("column_config") or {})
+                config["序号"] = st.column_config.NumberColumn("序号", format="%d", width="small")
+                kwargs["column_config"] = config
+                if kwargs.get("column_order") is not None:
+                    kwargs["column_order"] = ["序号"] + [c for c in kwargs["column_order"] if c != "序号"]
+            elif renderer.__name__ == "table":
+                data = data.style.hide(axis="index")
+        return renderer(data, *args, **kwargs)
+    display._gtms_numbered = True
+    return display
+
 def apply_theme():
+    # Shared presentation layer; editable data_editor is intentionally untouched.
+    for name in ("dataframe", "table"):
+        renderer = getattr(st, name)
+        if not getattr(renderer, "_gtms_numbered", False):
+            setattr(st, name, _numbered_display(renderer))
     st.markdown(CSS, unsafe_allow_html=True)
