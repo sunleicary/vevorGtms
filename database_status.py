@@ -15,7 +15,7 @@ EXPECTED = {"containers": 35657, "kpi_raw_rows_v2": 78488,
             "kpi_empty_return_timeliness": 2651, "kpi_source_ledger": 66932}
 
 def show_database_status(user, sqlite_path):
-    if user.get("role") != "管理员":
+    if user.get("role") not in ("管理员", "系统管理员"):
         st.error("仅管理员可以查看数据库状态。")
         return
     st.subheader("数据库连接状态")
@@ -33,7 +33,7 @@ def show_database_status(user, sqlite_path):
                 st.write(f"数据库名称：`{db_name}` · Schema：`{schema}`")
                 st.caption("服务端版本：" + version.split(",")[0][:100])
             else:
-                st.warning("当前使用 SQLite，并未切换至 Neon。请检查 Streamlit Secrets 中的 DATABASE_URL。")
+                st.success("当前使用 SQLite 本地数据库。旧 DATABASE_URL 已被程序忽略。")
             counts = {}
             for table in TABLES if neon else TABLES[:1]:
                 try:
