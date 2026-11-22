@@ -175,12 +175,33 @@ def login_gate():
     user = current_user()
     if user:
         return user
-    st.markdown("## 🔐 用户登录")
-    st.caption("司顺国际物流港后运营工作台 · 请登录后访问业务数据")
+    # Self-contained global logistics artwork; no external image requests.
+    import base64
+    artwork = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+    <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#10243e"/><stop offset="1" stop-color="#245379"/></linearGradient><pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#8bb4d4" opacity=".12"/></pattern></defs>
+    <rect width="1600" height="900" fill="url(#bg)"/><rect width="1600" height="900" fill="url(#grid)"/>
+    <g fill="#719aba" opacity=".26"><path d="M90 190L155 126 245 114 294 154 380 149 409 209 350 233 319 303 265 313 235 373 190 343 160 270 95 253Z"/><path d="M320 360L405 384 458 450 430 522 389 588 356 655 331 601 345 519 302 441Z"/><path d="M668 178L725 138 812 149 864 195 830 241 745 240 695 271 647 231Z"/><path d="M713 282L824 268 901 327 859 440 790 533 739 473 697 364Z"/><path d="M846 165L968 115 1110 139 1227 113 1398 179 1461 249 1370 294 1286 270 1239 359 1152 330 1118 414 1050 345 970 313 907 237Z"/><path d="M1200 535L1291 484 1392 530 1423 600 1340 640 1227 610Z"/></g>
+    <g fill="none" stroke="#83c9ed" stroke-width="2" opacity=".65" stroke-dasharray="7 8"><path d="M205 267Q720 -90 1240 290"/><path d="M1240 290Q1450 405 1320 565"/><path d="M205 267Q420 110 730 210"/><path d="M320 430Q640 120 1240 290"/><path d="M730 210Q1000 55 1240 290"/></g>
+    <g fill="#ff7845" stroke="#ffd3b9" stroke-width="2"><circle cx="205" cy="267" r="6"/><circle cx="320" cy="430" r="6"/><circle cx="730" cy="210" r="6"/><circle cx="1240" cy="290" r="6"/><circle cx="1320" cy="565" r="6"/></g>
+    <g fill="#c6e0f3" font-family="Arial" font-size="15" letter-spacing="3" opacity=".7"><text x="100" y="730">GLOBAL LOGISTICS</text><text x="1220" y="730">CONNECTED WORLD</text></g>
+    </svg>"""
+    encoded = base64.b64encode(artwork.encode("utf-8")).decode("ascii")
+    st.markdown("""<style>
+    .stApp {background:#10243e url('data:image/svg+xml;base64,""" + encoded + """') center center / cover no-repeat fixed!important}
+    [data-testid="stMainBlockContainer"],.block-container {max-width:420px!important;width:calc(100% - 32px)!important;min-height:100dvh!important;display:flex!important;flex-direction:column!important;justify-content:center!important;padding:24px 0!important;margin:auto!important}
+    [data-testid="stMain"] [data-testid="stForm"] {background:#fff!important;border:1px solid #d8e2ee!important;border-radius:14px!important;padding:26px!important;box-shadow:0 18px 65px #07172866!important}
+    .gtms-login-brand {text-align:center;color:#ff6428;font-size:32px;font-weight:900;letter-spacing:-1px;line-height:1.3}
+    .gtms-login-title {text-align:center;color:#17365a;font-size:19px;font-weight:650;margin:8px 0 2px}
+    .gtms-login-sub {text-align:center;color:#64748b;font-size:12px;margin-bottom:20px}
+    [data-testid="stForm"] label p {color:#334155!important;font-size:13px!important}
+    [data-testid="stFormSubmitButton"] button {width:100%!important;background:#1764ad!important;color:white!important;border:0!important;min-height:42px!important}
+    [data-testid="stFormSubmitButton"] button p {color:white!important}
+    </style>""", unsafe_allow_html=True)
     with st.form("user_login", clear_on_submit=True):
+        st.markdown('<div class="gtms-login-brand">VEVOR®</div><div class="gtms-login-title">全球运输管理系统</div><div class="gtms-login-sub">Global Transportation Management System</div>', unsafe_allow_html=True)
         username = st.text_input("用户名", value="admin")
         password = st.text_input("密码", type="password")
-        submitted = st.form_submit_button("登录工作台", type="primary")
+        submitted = st.form_submit_button("登录工作台", type="primary", use_container_width=True)
     if submitted:
         verified = authenticate(username, password)
         if verified:
