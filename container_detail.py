@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 def show_container_detail(data):
-    st.subheader("📦 港后货柜详情")
+    st.markdown('<div style="font-size:20px;font-weight:700;line-height:1.4">港后货柜详情</div>',unsafe_allow_html=True)
     st.caption("逐柜查看 · 基于已导入业务数据，非实时码头/GPS状态")
     if data.empty:
         st.info("当前筛选条件下没有货柜。请调整左侧区域、拖车商或 ETA 范围。")
@@ -45,16 +45,13 @@ def show_container_detail(data):
     def val(field):
         v = row.get(field, "")
         return "—" if pd.isna(v) or str(v).strip() in ("", "nan", "NaT", "None") else str(v)
-    st.markdown(f"### 🚢 {val('柜号显示')}  ·  {val('风险')}")
-    metrics = [
-        ("船公司", "船公司"), ("船名", "实际船名"), ("航次", "实际航次"),
-        ("ETA", "ETA日期"), ("ATA", "ATA日期"), ("LFD", "LFD"),
-        ("目的仓", "目的仓"), ("港后拖车商", "港后拖车行")]
-    for i in range(0,len(metrics),4):
-        cols = st.columns(4)
-        for col,(label,field) in zip(cols,metrics[i:i+4]):
-            col.metric(label,val(field))
-    st.markdown("#### 海柜全生命周期运输追踪")
+    st.markdown(f'<div style="font-size:18px;font-weight:700;line-height:1.4;margin:4px 0 10px">货柜 {escape(val("柜号显示"))} <span style="font-size:11px;font-weight:500;color:#64748b"> · {escape(val("风险"))}</span></div>',unsafe_allow_html=True)
+    metrics=[("船公司","船公司"),("船名","实际船名"),("航次","实际航次"),("最终ETA","ETA日期"),("最终ATA","ATA日期"),("提柜LFD","LFD"),("目的仓","目的仓"),("港后拖车商","港后拖车行")]
+    cells=[]
+    for label,field in metrics:
+        cells.append(f'<div style="min-width:0;padding:9px 12px"><div style="font-size:11px;color:#64748b;margin-bottom:3px">{label}</div><div style="font-size:14px;color:#17324d;font-weight:600;overflow-wrap:anywhere;line-height:1.4">{escape(val(field))}</div></div>')
+    st.markdown('<div style="background:#f8fafc;border:1px solid #dbe3ec;border-radius:9px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:2px;padding:4px">'+''.join(cells)+'</div>',unsafe_allow_html=True)
+    st.markdown('<div style="font-size:14px;font-weight:700;margin:12px 0 4px">海柜全生命周期运输追踪</div>',unsafe_allow_html=True)
     today=pd.Timestamp(date.today())
     def parsed(field):
         return pd.to_datetime(val(field),errors="coerce") if field else pd.NaT
@@ -116,22 +113,16 @@ def show_container_detail(data):
         plan_text=planned.strftime("%Y-%m-%d") if pd.notna(planned) else "—"
         note=f"截止 {shown(limit)[:10]}" if limit else f"计划 {plan_text}" if plan else ""
         gap=f"间隔 {elapsed} 天" if elapsed is not None and elapsed>=0 else ""
-        cards.append(f'<div style="flex:1;min-width:112px;text-align:center;position:relative;z-index:1;padding:0 3px"><div style="width:44px;height:44px;margin:auto;background:#fff;border:1.5px solid {color};border-radius:50%;display:flex;align-items:center;justify-content:center;color:{color}"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{icon}"/></svg></div><div style="font-size:13px;font-weight:700;margin-top:9px;color:#17324d">{short}</div><div style="font-size:13px;font-weight:600;color:{color};margin-top:5px">{actual_text}</div><div style="font-size:11px;color:{color};margin-top:3px">{status}</div><div style="font-size:10px;color:#64748b;margin-top:5px">{escape(note)}</div><div style="font-size:10px;color:#64748b">{gap}</div></div>')
+        cards.append(f'<div style="flex:1;min-width:112px;text-align:center;position:relative;z-index:1;padding:0 3px"><div style="width:36px;height:36px;margin:auto;background:#fff;border:1.5px solid {color};border-radius:50%;display:flex;align-items:center;justify-content:center;color:{color}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{icon}"/></svg></div><div style="font-size:12px;font-weight:700;margin-top:6px;color:#17324d">{short}</div><div style="font-size:12px;font-weight:600;color:{color};margin-top:5px">{actual_text}</div><div style="font-size:11px;color:{color};margin-top:3px">{status}</div><div style="font-size:10px;color:#64748b;margin-top:5px">{escape(note)}</div><div style="font-size:10px;color:#64748b">{gap}</div></div>')
         records.append({"节点":name,"实际时间":shown(field),"实际来源":field,"计划时间":shown(plan) if plan else "—","截止日期":shown(limit) if limit else "—","状态":status,"超期判断":risk,"阶段耗时（天）":elapsed})
         previous=actual if done else pd.NaT
-    st.markdown('<div style="background:#f8fafc;border:1px solid #dbe3ec;border-top:3px solid #f97316;border-radius:12px;padding:22px 14px 18px;overflow-x:auto"><div style="display:flex;position:relative;min-width:'+str(len(events)*118)+'px"><div style="position:absolute;left:7%;right:7%;top:22px;height:2px;background:#cbd5e1"></div>'+''.join(cards)+'</div></div>',unsafe_allow_html=True)
-    cols=st.columns(4)
-    cols[0].metric("节点记录",f"{completed}/{len(events)}")
-    cols[1].metric("累计耗时",f"{duration} 天" if duration is not None and duration>=0 else "待核实")
-    for col,label,risk in [(cols[2],"提柜LFD",pickup_status),(cols[3],"还空截止",return_status)]:
-        with col:
-            st.caption(label)
-            if risk.startswith(("超期","已过截止日")):
-                st.error(risk)
-            elif risk=="未超期":
-                st.success(risk)
-            else:
-                st.write(risk)
+    st.markdown('<div style="background:#f8fafc;border:1px solid #dbe3ec;border-top:3px solid #f97316;border-radius:12px;padding:14px 10px 12px;overflow-x:auto"><div style="display:flex;position:relative;min-width:'+str(len(events)*118)+'px"><div style="position:absolute;left:7%;right:7%;top:18px;height:1px;background:#cbd5e1"></div>'+''.join(cards)+'</div></div>',unsafe_allow_html=True)
+    stats=[("节点记录",f"{completed}/{len(events)}"),("累计耗时",f"{duration} 天" if duration is not None and duration>=0 else "待核实"),("提柜LFD",pickup_status),("还空截止",return_status)]
+    cards2=[]
+    for label,value in stats:
+        color="#dc2626" if value.startswith(("超期","已过截止日")) else "#15803d" if value=="未超期" else "#17324d"
+        cards2.append(f'<div style="padding:8px 12px;min-width:0"><div style="font-size:11px;color:#64748b">{label}</div><div style="font-size:14px;font-weight:600;color:{color};margin-top:3px;overflow-wrap:anywhere">{escape(value)}</div></div>')
+    st.markdown('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:4px;background:#f8fafc;border:1px solid #dbe3ec;border-radius:8px">'+''.join(cards2)+'</div>',unsafe_allow_html=True)
     st.caption("绿色：已记录 ｜ 蓝色：预计 ｜ 橙色：需核实 ｜ 红色：超期/异常 ｜ 灰色：未记录")
     with st.expander("展开完整节点日期及超期明细"):
         st.dataframe(pd.DataFrame(records),hide_index=True,use_container_width=True)
@@ -149,7 +140,6 @@ def show_container_detail(data):
         for col,(heading,fields) in zip(cols,groups[i:i+2]):
             with col:
                 with st.container(border=True):
-                    st.markdown(f"**{heading}**")
-                    st.dataframe(pd.DataFrame([{"字段":f,"数据":val(f)} for f in fields]),
-                        hide_index=True,use_container_width=True)
+                    st.markdown(f'<div style="font-size:14px;font-weight:600">{escape(heading)}</div>',unsafe_allow_html=True)
+                    st.markdown('<div style="font-size:12px;line-height:1.5">'+''.join(f\'<div style="display:grid;grid-template-columns:minmax(100px,40%) 1fr;gap:8px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.22)"><span style="color:#64748b">{escape(f)}</span><span style="overflow-wrap:anywhere">{escape(val(f))}</span></div>\' for f in fields)+'</div>',unsafe_allow_html=True)
     st.caption("注意：未记录不代表未发生；LFD风险基于Excel中的日期推算，不能代替码头实时核实。")
