@@ -32,12 +32,6 @@ from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, sho
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
 apply_theme()
-st.markdown("""<div class="vevor-topbar">
-  <div class="vevor-logo">VEVOR®</div>
-  <div class="vevor-divider"></div>
-  <div class="vevor-title">国际物流港后运营工作台 <span style="font-weight:500">|</span> 全球港后运营管理</div>
-  <div class="vevor-tag">数据驱动 · 异常预警 · 高效提柜</div>
-</div><div class="vevor-subtitle">全球国家业务分析 + 美国六大区域运营 · 仅按港后拖车行统计 · 数据非实时码头状态</div>""",unsafe_allow_html=True)
 
 @st.cache_data(show_spinner=False, ttl=60)
 def read_db(mtime):
@@ -80,7 +74,7 @@ def grid(data, key="default"):
 user = login_gate()
 
 with st.sidebar:
-    st.markdown('<div class="vevor-sidebar-logo">VEVOR®<span>全球港后运营管理</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="vevor-sidebar-logo">VEVOR®</div>', unsafe_allow_html=True)
     st.caption(f'当前用户：{user["username"]} · {user["role"]}')
     # Five business domains; labels are kept separate from legacy handlers.
     navigation = {
