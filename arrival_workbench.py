@@ -39,8 +39,37 @@ def build_arrivals(frame, today):
         z.loc[hits[name]&hits.sum(axis=1).eq(1),"最终港/站"]=name
     return z
 
+
+def render_schematic(summary):
+    """Static, responsive SVG; no basemap, network requests or map controls."""
+    layout = [
+        ("洛杉矶/长滩港","LA / LB",102,213,8,249,143),
+        ("纽约/新泽西港","NY / NJ",531,150,510,38,142),
+        ("萨凡纳港","SAV",459,253,510,278,142),
+        ("休斯顿港","HOU",328,283,233,328,146),
+        ("芝加哥铁路站","CHI",381,153,277,4,153),
+        ("亚特兰大铁路站","ATL",431,232,345,196,150),
+    ]
+    parts = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 405" role="img" aria-label="美国六大港口及铁路站场柜量示意图" style="width:100%;height:auto;display:block;font-family:Arial,Microsoft YaHei,sans-serif">',
+             '<rect width="660" height="405" rx="10" fill="#10243e"/>',
+             '<path d="M65 46 L122 60 L170 65 L218 69 L270 72 L306 73 L322 87 L350 77 L375 86 L388 108 L405 98 L419 113 L435 104 L452 128 L470 119 L484 99 L514 96 L537 72 L557 78 L562 105 L548 120 L532 126 L535 149 L517 166 L508 189 L490 204 L480 229 L461 248 L474 273 L491 303 L481 319 L466 311 L447 276 L425 257 L398 261 L379 250 L362 273 L340 271 L326 306 L317 338 L295 327 L280 300 L254 280 L229 286 L212 260 L183 251 L159 235 L128 230 L111 209 L91 198 L80 167 L64 144 L51 112 L58 86 Z" fill="#253e58" stroke="#607a96" stroke-width="1.5" transform="translate(10 20)"/>']
+    for name,code,x,y,bx,by,w in layout:
+        color = "#38bdf8" if code in ("CHI","ATL") else "#ff9a54"
+        parts.append(f'<path d="M{x} {y} L{bx+w/2} {by+32}" stroke="{color}" stroke-width="1.3" stroke-dasharray="3 3" fill="none"/><circle cx="{x}" cy="{y}" r="11" fill="{color}" opacity=".2"/><circle cx="{x}" cy="{y}" r="4.5" fill="{color}" stroke="white"/>')
+    for name,code,x,y,bx,by,w in layout:
+        color = "#38bdf8" if code in ("CHI","ATL") else "#ff9a54"
+        count = int(summary.loc[name,"总柜量"])
+        parts.append(f'<rect x="{bx}" y="{by}" width="{w}" height="65" rx="7" fill="#10243e" stroke="{color}"/><text x="{bx+10}" y="{by+19}" font-size="13" fill="#e2e8f0" font-weight="600">{name}</text><text x="{bx+10}" y="{by+48}" font-size="25" fill="{color}" font-weight="bold">{count:,}</text><text x="{bx+w-9}" y="{by+48}" text-anchor="end" font-size="10" fill="#b5c8df">{code} · 柜</text>')
+    parts.append('</svg>')
+    st.markdown('<div style="max-width:1050px;margin:auto">'+''.join(parts)+'</div>',unsafe_allow_html=True)
+    st.caption("橙色：海运港群 ｜ 蓝色：铁路站场 ｜ 示意位置，非精确地理坐标。其他目的地单独统计。")
+    st.caption("点击下方区域按钮，切换每日趋势及货柜明细。")
+    for col,name in zip(st.columns(6),NODES):
+        if col.button(name, key="arrival_map_"+name, use_container_width=True):
+            st.session_state["arrival_destination_filter"]=name
+
+
 def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
-    import pydeck as pdk
     today=pd.Timestamp(date.today())
     all_rows=build_arrivals(frame,today)
     st.title("港口与铁路到站动态监控中心")
@@ -67,9 +96,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         c.metric(name,f"{val:,}")
     st.caption(f"ETA直接取值 {int(z['日期来源'].eq('ETA日期').sum()):,}；预计卸柜兜底 {int(z['日期来源'].eq('目的港预计卸柜时间').sum()):,}；筛选前缺有效日期 {int(all_rows['统计日期'].isna().sum()):,}。")
     st.subheader("美国六大港口与铁路站场运营地图")
-    points=pd.DataFrame([dict(name=n,lat=lat,lon=lon,count=int(summary.loc[n,"总柜量"]),label=f"{n} {int(summary.loc[n,'总柜量']):,}柜",radius=14+min(26,int(summary.loc[n,"总柜量"])**0.5)) for n,(lat,lon,_) in NODES.items()])
-    layers=[pdk.Layer("ScatterplotLayer",points,get_position="[lon, lat]",get_radius="radius",radius_units="pixels",get_fill_color=[235,105,40,175],pickable=True),pdk.Layer("TextLayer",points,get_position="[lon, lat]",get_text="label",get_size=14,get_color=[30,30,30],get_pixel_offset=[0,-35],pickable=False)]
-    st.pydeck_chart(pdk.Deck(layers=layers,initial_view_state=pdk.ViewState(latitude=37.5,longitude=-96,zoom=3.3),map_style="light",tooltip={"text":"{name}: {count} 柜"}))
+    render_schematic(summary)
     st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
     st.subheader("每日到港/站业务量趋势")
     chosen=st.selectbox("最终港/站下钻",["全美国","六大港/站"]+labels,key="arrival_destination_filter")
