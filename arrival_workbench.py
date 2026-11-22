@@ -49,22 +49,42 @@ def build_arrivals(frame, today):
 
 
 def render_schematic(summary):
-    """Real geographic basemap; fixed-height map and screen-sized text."""
-    import pydeck as pdk
-    offsets={"洛杉矶/长滩港":[57,-42],"纽约/新泽西港":[-35,-48],"萨凡纳港":[45,49],"休斯顿港":[-12,47],"芝加哥铁路站":[-35,-48],"亚特兰大铁路站":[-70,-9]}
-    records=[]
-    for name,(lat,lon,_) in NODES.items():
+    """Static geographic image background and live overlay cards; no map service."""
+    import html
+    outline = "M38,24 L370,24 L380,28 L412,34 L451,32 L494,49 L508,62 L526,89 L515,107 L565,98 L568,89 L590,89 L614,72 L654,72 L681,43 L699,47 L699,64 L708,74 L671,88 L662,104 L672,112 L625,123 L613,145 L606,139 L600,165 L603,185 L596,194 L563,210 L536,235 L536,252 L551,289 L547,310 L538,310 L518,277 L520,269 L508,253 L491,256 L475,247 L437,250 L439,262 L421,262 L393,255 L376,258 L346,278 L343,292 L346,302 L324,296 L300,259 L282,255 L275,264 L265,261 L252,244 L234,231 L213,231 L213,236 L180,236 L135,219 L107,222 L90,204 L65,197 L19,128 L21,108 L18,99 L25,66 L16,34 L35,36 L41,47 L44,44 Z"
+    positions = {
+        "洛杉矶/长滩港": ("2%", "46%", False),
+        "纽约/新泽西港": ("77%", "7%", False),
+        "萨凡纳港": ("77%", "67%", False),
+        "休斯顿港": ("29%", "71%", False),
+        "芝加哥铁路站": ("48%", "7%", True),
+        "亚特兰大铁路站": ("54%", "43%", True),
+    }
+    cards=[]
+    for name,(left,top,rail) in positions.items():
         total=int(summary.loc[name,"总柜量"])
         arrived=int(summary.loc[name,"已到港/站"])
-        records.append({"name":name,"lat":lat,"lon":lon,"total":total,"arrived":arrived,"transit":total-arrived,
-                        "label":f"{name}\n总柜量  {total:,}\n已到港/站  {arrived:,}\n在途  {total-arrived:,}",
-                        "color":[37,99,175,255] if name in ("芝加哥铁路站","亚特兰大铁路站") else [225,117,42,255],
-                        "offset":offsets[name]})
-    points=pdk.Layer("ScatterplotLayer",records,get_position="[lon, lat]",get_fill_color="color",get_line_color=[255,255,255],get_radius=5,radius_units="'pixels'",stroked=True,line_width_min_pixels=1,pickable=False)
-    labels=pdk.Layer("TextLayer",records,get_position="[lon, lat]",get_text="label",get_size=14,size_units="'pixels'",get_color=[32,52,73,255],get_pixel_offset="offset",get_text_anchor="'middle'",get_alignment_baseline="'center'",background=True,get_background_color=[255,255,255,255],background_padding=[7,4],get_border_color=[190,204,218,255],get_border_width=1,font_family="'Arial, Microsoft YaHei, sans-serif'",character_set="'auto'",font_settings={"sdf":False},pickable=False)
-    deck=pdk.Deck(layers=[points,labels],initial_view_state=pdk.ViewState(latitude=38.8,longitude=-96.0,zoom=2.75,pitch=0,bearing=0),map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",map_provider="carto",tooltip=False)
-    st.pydeck_chart(deck,use_container_width=True,height=320)
-    st.caption("橙色：海运港口 · 蓝色：铁路站场；在途含逾期未确认到达货柜。")
+        cards.append(
+            f'<div class="gtms-map-card" style="left:{left};top:{top};border-top-color:{"#2877b8" if rail else "#d97736"}">'
+            f'<div class="gtms-map-name">{html.escape(name)}</div>'
+            f'<div>总柜量 <b>{total:,}</b></div>'
+            f'<div class="gtms-map-arrived">已到 <b>{arrived:,}</b></div>'
+            f'<div class="gtms-map-transit">在途 <b>{total-arrived:,}</b></div></div>'
+        )
+    svg=f'<svg viewBox="0 0 730 340" preserveAspectRatio="xMidYMid meet" role="img" aria-label="美国本土地理背景" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gtmsLand" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#e4ebf0"/><stop offset="1" stop-color="#d2dee8"/></linearGradient></defs><path d="{outline}" fill="url(#gtmsLand)" stroke="#a3b6c6" stroke-width="1.4" transform="translate(0 8)"/></svg>'
+    st.markdown(
+        '<style>'
+        '.gtms-static-map{position:relative;width:100%;height:340px;overflow:hidden;border:1px solid #d8e3ec;border-radius:8px;background:linear-gradient(155deg,#f8fbfd,#edf4f9)}'
+        '.gtms-static-map svg{position:absolute;inset:0;width:100%;height:100%}'
+        '.gtms-map-card{position:absolute;box-sizing:border-box;width:21%;padding:7px 9px;border:1px solid #d7e1e9;border-top:3px solid;background:rgba(255,255,255,.96);border-radius:6px;box-shadow:0 2px 8px rgba(27,54,77,.09);font-size:14px;line-height:1.35;color:#34485d}'
+        '.gtms-map-name{font-weight:700;color:#17365a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+        '.gtms-map-card>div:not(:first-child){display:flex;justify-content:space-between;gap:4px}'
+        '.gtms-map-arrived{color:#16814b}.gtms-map-transit{color:#b66b1f}'
+        '</style><div class="gtms-static-map">'+svg+''.join(cards)+'</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("静态美国地理背景 · 数字来自当前筛选数据 · 橙色为海运港口，蓝色为铁路站场。")
+
 
 
 def show_vessel_schedule(rows, today):
