@@ -148,6 +148,15 @@ def build_vessel_alerts(rows, today, tolerance=1):
     return pd.DataFrame(result,columns=keys+["计划到港ETA","实际到港ATA","到港偏差天数","涉及柜量","船舶状态"]),missing_identity
 
 
+def build_carrier_share(rows):
+    carriers = rows.get("船公司", pd.Series("", index=rows.index, dtype="object"))
+    carriers = carriers.fillna("").astype(str).str.strip().str.upper()
+    missing = carriers.isin(["", "NAN", "NONE", "NULL", "N/A", "-", "未记录"])
+    share = carriers.mask(missing, "未记录").value_counts().rename_axis("航司").reset_index(name="柜量")
+    share["占比"] = share["柜量"].div(len(rows)) * 100
+    return share.sort_values(["柜量", "航司"], ascending=[False, True]).reset_index(drop=True)
+
+
 def default_arrival_eta_range(today):
     today = pd.Timestamp(today)
     return (
@@ -241,7 +250,9 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     with st.expander("节点统计与日期口径"):
         st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
         st.caption("在途含ETA已过但未记录到达的货柜；启用ETA筛选时，缺少ETA记录不计入地图总量。")
-    tab_plan,tab_vessel,tab_actual,tab_risk=st.tabs(["每日到港计划","船舶与航次","实际到港趋势","异常监控"])
+    tab_plan, tab_vessel, tab_actual, tab_risk, tab_carrier = st.tabs(
+        ["每日到港计划", "船舶与航次", "实际到港趋势", "异常监控", "航司占比"]
+    )
     with tab_plan:
         selected=st.selectbox("海运港口区域",["全美国"]+[name for name,_ in groups],key="arrival_vessel_plan_region")
         scope_mask=pd.Series(True,index=vessels.index) if selected=="全美国" else dict(groups)[selected]
@@ -290,3 +301,21 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         with st.expander("全部船舶到港状态（含数据待核实）"):
             st.dataframe(vessels,hide_index=True,use_container_width=True)
         st.download_button("下载异常航次 CSV",vessel_risk.to_csv(index=False).encode("utf-8-sig"),"vessel_alerts.csv","text/csv")
+    with tab_carrier:
+        node = st.selectbox("最终港/站", ["全部港/站"] + labels, key="arrival_carrier_node")
+        carrier_rows = z if node == "全部港/站" else z.loc[z["最终港/站"].eq(node)]
+        if carrier_rows.empty:
+            st.info("当前筛选范围内无货柜记录。")
+        else:
+            carrier_share = build_carrier_share(carrier_rows)
+            st.caption(f"统计范围共 {len(carrier_rows):,} 柜。按货柜记录的「船公司」统计，未记录航司的货柜也计入总柜量。")
+            st.dataframe(
+                carrier_share,
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "占比": st.column_config.ProgressColumn(
+                        "占比", min_value=0, max_value=100, format="%.1f%%"
+                    ),
+                },
+            )
