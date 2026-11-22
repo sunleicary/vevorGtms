@@ -105,7 +105,7 @@ with st.sidebar:
         st.warning("当前角色尚未开放业务页面，请联系系统管理员授权。")
         st.stop()
     if st.session_state.get("gtms_active_module") not in available_modules:
-        st.session_state["gtms_active_module"] = available_modules[0]
+        st.session_state["gtms_active_module"] = "港口与铁路到站动态监控中心" if "港口与铁路到站动态监控中心" in available_modules else available_modules[0]
     module = st.session_state["gtms_active_module"]
     for domain in visible_domains:
         with st.expander(
@@ -154,6 +154,7 @@ with st.sidebar:
     st.divider()
     if st.button("↪ 退出登录", key="logout_user", use_container_width=True):
         st.session_state.pop("auth_username", None)
+        st.session_state.pop("gtms_active_module", None)
         st.session_state.pop("sqlite_backup_zip", None)
         st.session_state.pop("sqlite_backup_filename", None)
         st.rerun()
