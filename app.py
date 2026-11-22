@@ -323,7 +323,9 @@ for col in ["ETA日期", "ATA日期", "LFD", "进口实际提箱时间", "实际
 if "目的港预计卸柜时间" not in df.columns:
     st.warning("当前数据库尚未保存目的港预计卸柜时间，请重新导入完整源表以启用 ETA 缺失补充。")
     df["目的港预计卸柜时间"] = ""
-df["统计日期_dt"] = df["ETA日期_dt"].fillna(pd.to_datetime(df["目的港预计卸柜时间"], errors="coerce", format="mixed"))
+if "ETA（计算）" not in df and "ETA(计算)" not in df:
+    st.warning("数据库尚未保存ETA（计算），请重新上传完整源表启用第三级日期兜底。")
+df["统计日期_dt"] = df["ETA日期_dt"].fillna(pd.to_datetime(df["目的港预计卸柜时间"], errors="coerce", format="mixed")).fillna(pd.to_datetime(df.get("ETA（计算）", df.get("ETA(计算)", pd.Series("", index=df.index))), errors="coerce", format="mixed"))
 # Shared sidebar filters for operational reports. Always use post-port supplier field.
 # The date range is inclusive; missing/invalid ETA is excluded only when a range is enabled.
 with st.sidebar:
@@ -379,7 +381,7 @@ if eta_enabled:
     else:
         st.info("请选择完整的 ETA 起止日期。")
         st.stop()
-st.caption("统计日期：ETA优先，缺失取目的港预计卸柜时间；最终到港/站以ATA日期为准；实际卸柜单独统计。")
+st.caption("统计日期：ETA日期 → 目的港预计卸柜时间 → ETA（计算）；最终到港/站以ATA日期为准；实际卸柜单独统计。")
 st.caption(f"当前运营筛选：{selected_region} · {selected_supplier} · "
            + (f"ETA {eta_range[0]} 至 {eta_range[1]}" if eta_enabled and eta_range and len(eta_range)==2 else "ETA不限")
            + f" · {len(df):,} 条业务记录")
@@ -426,7 +428,7 @@ elif page == "运营总览":
         with tab:
             z = q if name is None else q[q["区域"] == name]
             st.subheader(name or "美国港后运营总览")
-            st.caption("统计范围：遵循左侧日期筛选（ETA优先，缺失取预计卸柜时间）")
+            st.caption("统计范围：遵循左侧日期筛选（ETA日期 → 目的港预计卸柜时间 → ETA（计算））")
             arrived = z["ATA日期_dt"].dt.normalize().le(today)
             discharged = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").dt.normalize().le(today)
             picked = z["进口实际提箱时间_dt"].notna()
