@@ -261,6 +261,28 @@ div[class*="st-key-overview_metric_"][class$="_7"] button strong {color:#b47716!
 .stApp:has([data-testid="stSidebarCollapsedControl"] button) [data-testid="stMainBlockContainer"] {padding-top:48px!important}
 [data-testid="stSidebar"] [data-testid="stSidebarHeader"] {min-height:30px!important;height:30px!important}
 @media(max-width:700px){[data-testid="stMainBlockContainer"],.block-container{padding-top:48px!important}}
+
+/* Final sidebar palette: slate navigation, orange brand, accessible labels. */
+[data-testid="stSidebar"] {background:#172b43!important;border-right:1px solid #243d58!important;color:#e1eaf5!important}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap:.25rem!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] details {border:0!important;background:transparent!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {background:#203650!important;border-radius:5px!important;min-height:30px!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p {color:#f0f5fb!important;font-weight:600!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary svg {color:#a9bfd7!important}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {background:#294763!important}
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] {border-left:1px solid #39536e!important}
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button {background:transparent!important;color:#c5d5e7!important;border:0!important;min-height:29px!important;padding:4px 9px!important;box-shadow:none!important}
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button p {color:inherit!important;line-height:1.45!important;font-weight:500!important}
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button:hover {background:#294763!important;color:#fff!important}
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button[kind="primary"] {background:#34577b!important;color:#fff!important;border-left:3px solid #ff7845!important}
+[data-testid="stSidebar"] [class*="st-key-gtms_tree_"] button[kind="primary"]:hover {background:#41688f!important}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {color:#a9bfd7!important}
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {color:#d4e1ef!important;font-size:12px!important}
+[data-testid="stSidebar"] [class*="st-key-gtms_filter_"] label p,[data-testid="stSidebar"] [class*="st-key-gtms_filter_"] [data-testid="stWidgetLabel"] p {color:#f4d39a!important;-webkit-text-fill-color:#f4d39a!important;font-weight:600!important}
+[data-testid="stSidebar"] [data-testid="stCheckbox"] label p {color:#e2eaf4!important}
+[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] svg {color:#c5d5e7!important}
+[data-testid="stSidebar"] hr {border-color:#39536e!important;margin:6px 0!important}
+.gtms-filter-title {font-size:14px;font-weight:700;color:#f5f8fc;border-top:1px solid #39536e;padding-top:10px;margin:6px 0 3px;line-height:1.5}
 </style>'''
 
 def _numbered_display(renderer):
