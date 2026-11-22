@@ -19,9 +19,11 @@ def build_arrivals(frame, today):
     def dt(col):
         return pd.to_datetime(txt(col),errors="coerce",format="mixed").dt.normalize()
     z=z.loc[txt("目的仓国家").str.casefold().isin(["美国","us","usa","america","united states","united states of america"])].copy()
-    z["统计日期"]=dt("ETA日期").fillna(dt("目的港预计卸柜时间"))
+    calc=dt("ETA（计算）").fillna(dt("ETA(计算)"))
+    z["统计日期"]=dt("ETA日期").fillna(dt("目的港预计卸柜时间")).fillna(calc)
     z["日期来源"]="ETA日期"
     z.loc[dt("ETA日期").isna(),"日期来源"]="目的港预计卸柜时间"
+    z.loc[dt("ETA日期").isna() & dt("目的港预计卸柜时间").isna(),"日期来源"]="ETA（计算）"
     z.loc[z["统计日期"].isna(),"日期来源"]="缺失"
     z["实际到港/站"]=dt("ATA日期")
     z["实际海运到港"]=dt("卸货港ATA日期")
@@ -94,7 +96,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     cols=st.columns(4)
     for c,(name,val) in zip(cols,[("全美总柜量",len(z)),("六大港/站柜量",int(summary.loc[list(NODES),"总柜量"].sum())),("实际已到港/站",int(z["已到港/站"].sum())),("其他/待核实",int(summary.loc["其他/待核实","总柜量"]))]):
         c.metric(name,f"{val:,}")
-    st.caption(f"ETA直接取值 {int(z['日期来源'].eq('ETA日期').sum()):,}；预计卸柜兜底 {int(z['日期来源'].eq('目的港预计卸柜时间').sum()):,}；筛选前缺有效日期 {int(all_rows['统计日期'].isna().sum()):,}。")
+    st.caption(f"ETA直接取值 {int(z['日期来源'].eq('ETA日期').sum()):,}；预计卸柜兜底 {int(z['日期来源'].eq('目的港预计卸柜时间').sum()):,}；ETA（计算）兜底 {int(z['日期来源'].eq('ETA（计算）').sum()):,}；筛选前缺有效日期 {int(all_rows['统计日期'].isna().sum()):,}。")
     st.subheader("美国六大港口与铁路站场运营地图")
     render_schematic(summary)
     st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
@@ -119,6 +121,6 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     keys=[k for k in ["最终港/站","卸货港","船公司","实际船名","实际航次"] if k in detail]
     st.dataframe(detail.groupby(keys,dropna=False).size().reset_index(name="柜量"),hide_index=True,use_container_width=True)
     st.subheader("货柜明细")
-    fields=[k for k in ["排柜单号","箱号","目的地","最终港/站","目的仓物流区域","统计日期","日期来源","ETA日期","卸货港ETA日期","实际海运到港","实际到港/站","实际卸柜","港后拖车行","LFD","进口实际提箱时间","实际送仓时间","实际还柜日期"] if k in detail]
+    fields=[k for k in ["排柜单号","箱号","目的地","最终港/站","目的仓物流区域","统计日期","日期来源","ETA日期","目的港预计卸柜时间","ETA（计算）","卸货港ETA日期","实际海运到港","实际到港/站","实际卸柜","港后拖车行","LFD","进口实际提箱时间","实际送仓时间","实际还柜日期"] if k in detail]
     st.dataframe(detail[fields],hide_index=True,use_container_width=True)
     st.download_button("下载货柜明细 CSV",detail[fields].to_csv(index=False).encode("utf-8-sig"),"arrival_details.csv","text/csv")
