@@ -199,6 +199,26 @@ def sync(conn):
     updated,conflicts,unresolved=infer_port_countries(conn,cols,port_fields)
     return len(ports_added),len(terminals_added),updated,conflicts,unresolved
 
+def ensure_sqlite_v2(conn):
+    """Create SQLite-compatible integer-key master tables without replacing data."""
+    conn.execute("""CREATE TABLE IF NOT EXISTS gtms_ports_v2 (
+        port_id INTEGER PRIMARY KEY, port_name TEXT NOT NULL,
+        country_code TEXT NOT NULL DEFAULT '', unlocode TEXT NOT NULL DEFAULT '',
+        canonical_port_id INTEGER, classification TEXT NOT NULL DEFAULT 'seaport_or_port_city',
+        legacy_port_id TEXT NOT NULL DEFAULT '',
+        state_code TEXT NOT NULL DEFAULT '', operating_region_code TEXT NOT NULL DEFAULT '')""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS gtms_terminals_v2 (
+        terminal_id INTEGER PRIMARY KEY, terminal_name TEXT NOT NULL,
+        port_id INTEGER NOT NULL, operator_name TEXT NOT NULL DEFAULT '',
+        terminal_type TEXT NOT NULL DEFAULT 'container',
+        source_url TEXT NOT NULL DEFAULT '',
+        verification_status TEXT NOT NULL DEFAULT 'unverified',
+        legacy_terminal_id TEXT NOT NULL DEFAULT '',
+        state_code TEXT NOT NULL DEFAULT '', operating_region_code TEXT NOT NULL DEFAULT '')""")
+    # Existing installations may have older v2 schemas: the upgrade below
+    # adds the optional geographic columns without deleting any records.
+
+
 def upgrade_v2_geography(conn):
     """Idempotent schema extension and PNCT association correction."""
     for table in ("gtms_ports_v2","gtms_terminals_v2"):
@@ -233,15 +253,17 @@ def upgrade_v2_geography(conn):
 
 def show_global_ports_terminals(user, db):
     st.title("全球港口与码头管理")
-    st.caption("整数主键版本：港口、码头分别使用 BIGINT；旧字符型主数据只读保留，避免破坏既有业务关联。")
+    st.caption("SQLite 整数主键港口及码头主数据；自动建表，不覆盖既有记录。")
     with db_connect(db) as conn:
         if is_neon():
             exists=conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name IN ('gtms_ports_v2','gtms_terminals_v2')").fetchall()
             available={r["table_name"] for r in exists}
         else:
             available={r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('gtms_ports_v2','gtms_terminals_v2')").fetchall()}
-        if len(available)!=2:
-            st.warning("尚未初始化整数主键数据库。请先在 Neon SQL Editor 执行 gtms_integer_ids_neon_seed.sql；不会覆盖旧表。")
+        if not is_neon():
+            ensure_sqlite_v2(conn)
+        elif len(available)!=2:
+            st.warning("当前 PostgreSQL 缺少整数主键港口及码头主数据表。")
             return
         upgrade_v2_geography(conn)
         ports=[dict(r) for r in conn.execute("SELECT * FROM gtms_ports_v2 ORDER BY port_id").fetchall()]
