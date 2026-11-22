@@ -179,13 +179,54 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
             render_schematic(summary)
     with right:
         with st.container(border=True):
-            st.markdown("#### 各节点到达进度")
-            for name in summary.sort_values("总柜量",ascending=False).index:
-                total=int(summary.loc[name,"总柜量"])
-                done=int(summary.loc[name,"已到港/站"])
-                st.markdown(f"**{name}** · {done:,} / {total:,} 柜")
+            st.markdown("#### 美国港口船舶到港监控")
+            st.caption("当前货柜ETA范围内的海运挂靠航次；按卸货港归属，含铁路转运货柜。")
+            confirmed=vessels["实际到港ATA"].notna() & vessels["船舶状态"].ne("数据待核实")
+            pending=vessels["船舶状态"].isin(["计划到港","逾期未确认到港"])
+            for c,(label,value) in zip(st.columns(3),[("总航次",len(vessels)),("已到港",int(confirmed.sum())),("待到港",int(pending.sum()))]):
+                c.metric(label,value)
+            st.caption(f"待核实航次 {int((~confirmed & ~pending).sum())}；缺少船舶识别字段 {missing_identity} 柜。")
+            port_groups=[
+                ("洛杉矶/长滩港",NODES["洛杉矶/长滩港"][2]),
+                ("纽约/新泽西港",NODES["纽约/新泽西港"][2]),
+                ("萨凡纳港",NODES["萨凡纳港"][2]),
+                ("休斯顿港",NODES["休斯顿港"][2]),
+            ]
+            port_names=vessels["卸货港"].fillna("").astype(str)
+            assigned=pd.Series(False,index=vessels.index)
+            groups=[]
+            for name,pattern in port_groups:
+                mask=port_names.str.contains(pattern,case=False,regex=True)&~assigned
+                groups.append((name,mask))
+                assigned |= mask
+            groups.append(("其他卸货港",~assigned))
+            for name,mask in groups:
+                total=int(mask.sum())
+                done=int((mask&confirmed).sum())
+                waiting=int((mask&pending).sum())
+                st.markdown(f"**{name}** · {total} 航次")
                 st.progress(done/total if total else 0)
-            st.caption(f"缺少ETA且未记录到达：{len(missing):,} 柜（不受日期窗口限制）")
+                st.caption(f"已到 {done} · 待到 {waiting} · 待核实 {total-done-waiting}")
+                future=vessels.loc[mask&pending & vessels["计划到港ETA"].ge(today)].copy()
+                overdue=vessels.loc[mask&pending & vessels["计划到港ETA"].lt(today)]
+                if not overdue.empty:
+                    st.caption(f"原计划ETA已过 {len(overdue)} 航次，需核实新船期")
+                if not future.empty:
+                    daily=future.groupby("计划到港ETA").size().sort_index()
+                    st.caption("预计到港："+ " / ".join(f"{d:%m/%d} {n}艘" for d,n in daily.items()))
+                    horizon=daily.reindex(pd.date_range(today,max(today+pd.Timedelta(days=1),daily.index.max()+pd.Timedelta(days=1))),fill_value=0)
+                    for day,n in horizon.items():
+                        two=int(n+horizon.get(day+pd.Timedelta(days=1),0))
+                        if n>=3 or (n>0 and two>=4):
+                            st.error(f"{day:%m/%d} 单日{n}艘，连续两天{two}艘")
+                        elif n==2:
+                            st.warning(f"{day:%m/%d} 集中到港2艘")
+            with st.expander("未来7天船舶到港计划"):
+                upcoming=vessels.loc[pending & vessels["计划到港ETA"].between(today,today+pd.Timedelta(days=6))]
+                dates=pd.date_range(today,periods=7)
+                counts=upcoming.groupby("计划到港ETA").size().reindex(dates,fill_value=0)
+                st.bar_chart(counts.rename("预计航次"),height=180)
+                st.dataframe(upcoming,hide_index=True,use_container_width=True)
     with st.expander("节点统计与日期口径"):
         st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
         st.caption("在途含ETA已过但未记录到达的货柜；启用ETA筛选时，缺少ETA记录不计入地图总量。")
