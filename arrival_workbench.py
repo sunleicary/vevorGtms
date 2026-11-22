@@ -228,35 +228,27 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         st.dataframe(table.reset_index(),hide_index=True,use_container_width=True)
         st.download_button("下载每日柜量 CSV",table.to_csv().encode("utf-8-sig"),"daily_arrivals.csv","text/csv")
     with tab_vessel:
-        with st.expander("各港口到港计划与集中到港预警",expanded=True):
-            for name,mask in groups:
-                total=int(mask.sum())
-                done=int((mask&confirmed).sum())
-                waiting=int((mask&pending).sum())
-                st.markdown(f"**{name}** · {total} 航次")
-                st.progress(done/total if total else 0)
-                st.caption(f"已到 {done} · 待到 {waiting} · 待核实 {total-done-waiting}")
-                future=vessels.loc[mask&pending & vessels["计划到港ETA"].ge(today)].copy()
-                overdue=vessels.loc[mask&pending & vessels["计划到港ETA"].lt(today)]
-                if not overdue.empty:
-                    st.caption(f"原计划ETA已过 {len(overdue)} 航次，需核实新船期")
-                if not future.empty:
-                    daily=future.groupby("计划到港ETA").size().sort_index()
-                    st.caption("预计到港："+ " / ".join(f"{d:%m/%d} {n}艘" for d,n in daily.items()))
-                    horizon=daily.reindex(pd.date_range(today,max(today+pd.Timedelta(days=1),daily.index.max()+pd.Timedelta(days=1))),fill_value=0)
-                    for day,n in horizon.items():
-                        two=int(n+horizon.get(day+pd.Timedelta(days=1),0))
-                        if n>=3 or (n>0 and two>=4):
-                            st.error(f"{day:%m/%d} 单日{n}艘，连续两天{two}艘")
-                        elif n==2:
-                            st.warning(f"{day:%m/%d} 集中到港2艘")
-            with st.expander("未来7天船舶到港计划"):
-                upcoming=vessels.loc[pending & vessels["计划到港ETA"].between(today,today+pd.Timedelta(days=6))]
-                dates=pd.date_range(today,periods=7)
-                counts=upcoming.groupby("计划到港ETA").size().reindex(dates,fill_value=0)
-                st.bar_chart(counts.rename("预计航次"),height=180)
-                st.dataframe(upcoming,hide_index=True,use_container_width=True)
-        show_vessel_schedule(z,today)
+        st.markdown("#### 单日集中到港监控")
+        concentrated=[]
+        for name,mask in groups:
+            # Other ports are not one geographic port: count each separately.
+            subset=vessels.loc[mask & pending & vessels["计划到港ETA"].ge(today)]
+            if name=="其他卸货港":
+                daily=subset.groupby(["计划到港ETA","卸货港"]).size()
+                entries=[(day,port,int(n)) for (day,port),n in daily.items()]
+            else:
+                daily=subset.groupby("计划到港ETA").size()
+                entries=[(day,name,int(n)) for day,n in daily.items()]
+            for day,port,n in entries:
+                if n>=2:
+                    concentrated.append({"预计到港日期":day.strftime("%Y-%m-%d"),"港口区域":port,"预计航次":n,"集中到港预警":"红色预警" if n>=3 else "黄色预警"})
+        if concentrated:
+            alerts=pd.DataFrame(concentrated).sort_values(["预计到港日期","预计航次","港口区域"],ascending=[True,False,True]).reset_index(drop=True)
+            styled=alerts.style.map(lambda v:"color:#ba3c43;font-weight:600" if v=="红色预警" else "color:#b7791f;font-weight:600",subset=["集中到港预警"])
+            st.dataframe(styled,hide_index=True,use_container_width=True)
+        else:
+            st.success("当前统计周期内无单日多船集中到港预警")
+        st.caption("按当前ETA筛选货柜范围、海运卸货港及卸货港ETA统计未确认到港的未来航次；单日2航次黄色，3航次及以上红色。日期待核实及已过原计划ETA的航次见异常监控。")
     with tab_actual:
         st.subheader("实际到达趋势（同一ETA业务范围）")
         actual=detail.loc[detail["已到港/站"]].groupby("实际到港/站").size()
