@@ -29,6 +29,7 @@ def build_arrivals(frame, today):
     z["实际海运到港"]=dt("卸货港ATA日期")
     z["实际卸柜"]=dt("目的港/站卸柜日期")
     z["已到港/站"]=z["实际到港/站"].le(today)
+    z["提前到达"]=z["已到港/站"] & z["实际到港/站"].lt(dt("ETA日期"))
     z["已卸柜"]=z["实际卸柜"].le(today)
     z["已提柜"]=dt("进口实际提箱时间").le(today)
     z["已送仓"]=dt("实际送仓时间").fillna(dt("实际到海外仓日期")).le(today)
@@ -141,9 +142,10 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         summary["缺少ETA（窗口外单列）"]=missing.groupby("最终港/站").size().reindex(labels,fill_value=0)
         summary=summary.drop(columns="缺少ETA且未记录到港")
     arrived=int(z["已到港/站"].sum())
+    early=int(z["提前到达"].sum())
     cols=st.columns(5)
-    for c,(name,val) in zip(cols,[("全美总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("到达率",f"{arrived/len(z):.1%}" if len(z) else "—"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
-        c.metric(name,val)
+    for c,(name,val) in zip(cols,[("全美总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("提前到达率",f"{early/len(z):.1%}" if len(z) else "—"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
+        c.metric(name,val,help="有效ATA日期严格早于原始ETA日期的柜量 / 当前筛选总柜量；缺少日期不计入分子。" if name=="提前到达率" else None)
     left,right=st.columns([3,2])
     with left:
         with st.container(border=True):
