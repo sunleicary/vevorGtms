@@ -172,6 +172,20 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     cols=st.columns(5)
     for c,(name,val) in zip(cols,[("全美总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("船舶异常航次",f"{len(vessel_risk):,}"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
         c.metric(name,val,help="按船司、船名、航次、卸货港去重；海运ATA或当前日期超过卸货港ETA一天。缺失或冲突日期单列待核实。" if name=="船舶异常航次" else None)
+    port_groups=[
+        ("洛杉矶/长滩港",NODES["洛杉矶/长滩港"][2]),
+        ("纽约/新泽西港",NODES["纽约/新泽西港"][2]),
+        ("萨凡纳港",NODES["萨凡纳港"][2]),
+        ("休斯顿港",NODES["休斯顿港"][2]),
+    ]
+    port_names=vessels["卸货港"].fillna("").astype(str)
+    assigned=pd.Series(False,index=vessels.index)
+    groups=[]
+    for name,pattern in port_groups:
+        mask=port_names.str.contains(pattern,case=False,regex=True)&~assigned
+        groups.append((name,mask))
+        assigned |= mask
+    groups.append(("其他卸货港",~assigned))
     left,right=st.columns([2,1])
     with left:
         with st.container(border=True):
@@ -185,11 +199,20 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
             total=len(vessels)
             done=int(confirmed.sum())
             waiting=int(pending.sum())
-            st.metric("总航次",f"{total:,}")
-            st.progress(done/total if total else 0)
-            for c,(label,value) in zip(st.columns(3),[("已到港",done),("待到港",waiting),("待核实",total-done-waiting)]):
+            for c,(label,value) in zip(st.columns(3),[("总航次",total),("已到港",done),("待到港",waiting)]):
                 c.metric(label,f"{value:,}")
-            st.caption("按船舶挂靠航次统计，详情见「船舶与航次」。")
+            regional=[]
+            for name,mask in groups:
+                n=int(mask.sum())
+                d=int((mask&confirmed).sum())
+                w=int((mask&pending).sum())
+                abnormal=int((mask & vessels["船舶状态"].isin(["延误到港","逾期未确认到港"])).sum())
+                regional.append({"港口区域":name.replace("港","") if name!="其他卸货港" else "其他港口","总航次":n,"已到":d,"待到":w,"待核实":n-d-w,"异常":abnormal})
+            regional.append({"港口区域":"合计","总航次":total,"已到":done,"待到":waiting,"待核实":total-done-waiting,"异常":len(vessel_risk)})
+            region_table=pd.DataFrame(regional)
+            styled=region_table.style.set_properties(subset=["已到"],**{"color":"#15803d"}).set_properties(subset=["待到"],**{"color":"#b7791f"}).set_properties(subset=["异常"],**{"color":"#ba3c43"})
+            st.dataframe(styled,hide_index=True,use_container_width=True,height=248)
+            st.caption(f"按海运卸货港及挂靠航次统计；缺少船舶识别字段 {missing_identity} 柜。详情见「船舶与航次」。")
     with st.expander("节点统计与日期口径"):
         st.dataframe(summary.reset_index(),hide_index=True,use_container_width=True)
         st.caption("在途含ETA已过但未记录到达的货柜；启用ETA筛选时，缺少ETA记录不计入地图总量。")
@@ -209,20 +232,6 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         st.download_button("下载每日柜量 CSV",table.to_csv().encode("utf-8-sig"),"daily_arrivals.csv","text/csv")
     with tab_vessel:
         with st.expander("各港口到港计划与集中到港预警",expanded=True):
-            port_groups=[
-                ("洛杉矶/长滩港",NODES["洛杉矶/长滩港"][2]),
-                ("纽约/新泽西港",NODES["纽约/新泽西港"][2]),
-                ("萨凡纳港",NODES["萨凡纳港"][2]),
-                ("休斯顿港",NODES["休斯顿港"][2]),
-            ]
-            port_names=vessels["卸货港"].fillna("").astype(str)
-            assigned=pd.Series(False,index=vessels.index)
-            groups=[]
-            for name,pattern in port_groups:
-                mask=port_names.str.contains(pattern,case=False,regex=True)&~assigned
-                groups.append((name,mask))
-                assigned |= mask
-            groups.append(("其他卸货港",~assigned))
             for name,mask in groups:
                 total=int(mask.sum())
                 done=int((mask&confirmed).sum())
