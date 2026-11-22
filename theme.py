@@ -3,8 +3,7 @@ import streamlit as st
 import pandas as pd
 from functools import wraps
 
-CSS = '''/* VEVOR V0.98-inspired visual system. Presentation only; no business logic. */
-<style>
+CSS = '''<style>
 :root {--vevor-navy:#071f56;--vevor-blue:#0c4aa0;--vevor-orange:#ff5418;--vevor-ice:#edf5ff}
 .stApp {background:linear-gradient(125deg,#f4f8ff 0%,#eaf3ff 75%,#e6f0ff 100%);color:#071f56}
 .block-container {max-width:1800px;padding-top:1rem;padding-bottom:2rem}
