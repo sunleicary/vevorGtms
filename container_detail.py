@@ -141,5 +141,5 @@ def show_container_detail(data):
             with col:
                 with st.container(border=True):
                     st.markdown(f'<div style="font-size:14px;font-weight:600">{escape(heading)}</div>',unsafe_allow_html=True)
-                    st.markdown('<div style="font-size:12px;line-height:1.5">'+''.join(f\'<div style="display:grid;grid-template-columns:minmax(100px,40%) 1fr;gap:8px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.22)"><span style="color:#64748b">{escape(f)}</span><span style="overflow-wrap:anywhere">{escape(val(f))}</span></div>\' for f in fields)+'</div>',unsafe_allow_html=True)
+                    st.markdown('<div style="font-size:12px;line-height:1.5">'+''.join(f'<div style="display:grid;grid-template-columns:minmax(100px,40%) 1fr;gap:8px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.22)"><span style="color:#64748b">{escape(f)}</span><span style="overflow-wrap:anywhere">{escape(val(f))}</span></div>' for f in fields)+'</div>',unsafe_allow_html=True)
     st.caption("注意：未记录不代表未发生；LFD风险基于Excel中的日期推算，不能代替码头实时核实。")
