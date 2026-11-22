@@ -75,7 +75,7 @@ user = login_gate()
 
 with st.sidebar:
     st.markdown('<div class="vevor-sidebar-logo">VEVOR®</div>', unsafe_allow_html=True)
-    st.caption(f'当前用户：{user["username"]} · {user["role"]}')
+    st.caption(f'{user["username"]} · {user["role"]}')
     # Five business domains; labels are kept separate from legacy handlers.
     navigation = {
         "港后运营管理": [
@@ -375,10 +375,7 @@ if eta_enabled:
     else:
         st.info("请选择完整的 ETA 起止日期。")
         st.stop()
-st.caption("统计日期：ETA日期 → 目的港预计卸柜时间 → ETA（计算）；最终到港/站以ATA日期为准；实际卸柜单独统计。")
-st.caption(f"当前运营筛选：{selected_region} · {selected_supplier} · "
-           + (f"ETA {eta_range[0]} 至 {eta_range[1]}" if eta_enabled and eta_range and len(eta_range)==2 else "ETA不限")
-           + f" · {len(df):,} 条业务记录")
+st.caption(f"当前记录：{len(df):,} 柜")
 
 if page == "港后拖车商DO分配":
     show_do_assignment(user, DB, df)
@@ -422,7 +419,6 @@ elif page == "运营总览":
         with tab:
             z = q if name is None else q[q["区域"] == name]
             st.subheader(name or "美国港后运营总览")
-            st.caption("统计范围：遵循顶部日期筛选（ETA日期 → 目的港预计卸柜时间 → ETA（计算））")
             arrived = z["ATA日期_dt"].dt.normalize().le(today)
             discharged = pd.to_datetime(z["目的港/站卸柜日期"], errors="coerce", format="mixed").dt.normalize().le(today)
             picked = z["进口实际提箱时间_dt"].notna()
@@ -443,8 +439,7 @@ elif page == "运营总览":
             for metric_idx, (col, (label, mask)) in enumerate(zip(st.columns(len(metric_masks)), metric_masks)):
                 count = int(mask.sum())
                 with col:
-                    st.markdown(f'<div class="gtms-kpi-label">{label}</div>', unsafe_allow_html=True)
-                    if st.button(f"{count:,}", key=f"overview_metric_{i}_{metric_idx}",
+                    if st.button(f"{label}\n\n**{count:,}**", key=f"overview_metric_{i}_{metric_idx}",
                                  help=f"点击查看「{label}」的 {count:,} 条货柜记录",
                                  disabled=count == 0, use_container_width=True):
                         st.session_state[selected_metric_key] = (
@@ -465,8 +460,7 @@ elif page == "运营总览":
 
             st.markdown("### 🚨 区域港后供应商 LFD 预警统计")
             with st.container(border=True):
-                st.caption("按当前区域及 ETA 范围统计；仅使用「港后拖车行」字段。"
-                           "预警分为已过待核实、三天内到期、提箱晚于LFD；缺少提箱记录不等于确认未提箱。")
+                st.caption("缺少提箱记录不等于确认未提箱。")
                 alert_data = z.copy()
                 alert_data["港后供应商"] = alert_data["港后拖车行"].fillna("").astype(str).str.strip()
                 alert_data.loc[alert_data["港后供应商"].isin(
@@ -525,7 +519,6 @@ elif page == "运营总览":
             with chart_left:
                 with st.container(border=True):
                     st.markdown("#### 各区域总业务柜量")
-                    st.caption("单位：柜 · 当前筛选范围")
                     volume = z["区域"].value_counts().sort_values(ascending=True)
                     if volume.empty:
                         st.info("当前范围内暂无货柜记录")
@@ -535,7 +528,6 @@ elif page == "运营总览":
             with chart_right:
                 with st.container(border=True):
                     st.markdown("#### 各区域港后拖车商占比")
-                    st.caption("100% 堆叠 · 按港后拖车行统计（含未分配）")
                     share_data = z[["区域", "港后拖车行"]].copy()
                     share_data["港后拖车行"] = share_data["港后拖车行"].fillna("").astype(str).str.strip()
                     share_data.loc[share_data["港后拖车行"].eq(""), "港后拖车行"] = "未分配/未记录"
