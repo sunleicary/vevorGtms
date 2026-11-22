@@ -29,7 +29,6 @@ def build_arrivals(frame, today):
     z["实际海运到港"]=dt("卸货港ATA日期")
     z["实际卸柜"]=dt("目的港/站卸柜日期")
     z["已到港/站"]=z["实际到港/站"].le(today)
-    z["提前到达"]=z["已到港/站"] & z["实际到港/站"].lt(dt("ETA日期"))
     z["已卸柜"]=z["实际卸柜"].le(today)
     z["已提柜"]=dt("进口实际提箱时间").le(today)
     z["已送仓"]=dt("实际送仓时间").fillna(dt("实际到海外仓日期")).le(today)
@@ -116,6 +115,32 @@ def show_vessel_schedule(rows, today):
         st.dataframe(v[[k for k in fields if k in v]],hide_index=True,use_container_width=True)
         st.download_button("下载船舶货柜明细 CSV",v[[k for k in fields if k in v]].to_csv(index=False).encode("utf-8-sig"),"vessel_container_details.csv","text/csv")
 
+def build_vessel_alerts(rows, today, tolerance=1):
+    keys=["船公司","实际船名","实际航次","卸货港"]
+    v=rows.copy()
+    for k in keys:
+        v[k]=v.get(k,pd.Series("",index=v.index)).fillna("").astype(str).str.strip().str.upper()
+    valid=v[keys].apply(lambda c: ~c.isin(["","NAN","NONE","未记录","-"])).all(axis=1)
+    missing_identity=int((~valid).sum())
+    v=v.loc[valid].copy()
+    v["_eta"]=pd.to_datetime(v.get("卸货港ETA日期",pd.Series("",index=v.index)),errors="coerce",format="mixed").dt.normalize()
+    v["_ata"]=pd.to_datetime(v.get("卸货港ATA日期",pd.Series("",index=v.index)),errors="coerce",format="mixed").dt.normalize()
+    result=[]
+    for identity,g in v.groupby(keys):
+        etas=g["_eta"].dropna().unique()
+        atas=g.loc[g["_ata"].le(today),"_ata"].dropna().unique()
+        eta=pd.Timestamp(etas[0]) if len(etas)==1 else pd.NaT
+        ata=pd.Timestamp(atas[0]) if len(atas)==1 else pd.NaT
+        days=None
+        if len(etas)!=1 or len(atas)>1 or g["_ata"].gt(today).any():
+            status="数据待核实"
+        else:
+            days=( (ata if pd.notna(ata) else today)-eta).days
+            status=("延误到港" if days>tolerance else "正常到港") if pd.notna(ata) else ("逾期未确认到港" if days>tolerance else "计划到港")
+        result.append(dict(zip(keys,identity)) | {"计划到港ETA":eta,"实际到港ATA":ata,"到港偏差天数":days,"涉及柜量":g["排柜单号"].nunique(),"船舶状态":status})
+    return pd.DataFrame(result,columns=keys+["计划到港ETA","实际到港ATA","到港偏差天数","涉及柜量","船舶状态"]),missing_identity
+
+
 def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     today=pd.Timestamp(date.today())
     all_rows=build_arrivals(frame,today)
@@ -142,10 +167,11 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         summary["缺少ETA（窗口外单列）"]=missing.groupby("最终港/站").size().reindex(labels,fill_value=0)
         summary=summary.drop(columns="缺少ETA且未记录到港")
     arrived=int(z["已到港/站"].sum())
-    early=int(z["提前到达"].sum())
+    vessels,missing_identity=build_vessel_alerts(z,today)
+    vessel_risk=vessels[vessels["船舶状态"].isin(["延误到港","逾期未确认到港"])]
     cols=st.columns(5)
-    for c,(name,val) in zip(cols,[("全美总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("提前到达率",f"{early/len(z):.1%}" if len(z) else "—"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
-        c.metric(name,val,help="有效ATA日期严格早于原始ETA日期的柜量 / 当前筛选总柜量；缺少日期不计入分子。" if name=="提前到达率" else None)
+    for c,(name,val) in zip(cols,[("全美总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("船舶异常航次",f"{len(vessel_risk):,}"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
+        c.metric(name,val,help="按船司、船名、航次、卸货港去重；海运ATA或当前日期超过卸货港ETA一天。缺失或冲突日期单列待核实。" if name=="船舶异常航次" else None)
     left,right=st.columns([3,2])
     with left:
         with st.container(border=True):
@@ -185,6 +211,13 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         if not actual.empty:
             st.bar_chart(actual.rename("实际到港/站柜量"))
     with tab_risk:
+        st.markdown("#### 船舶到港异常航次（全美当前筛选）")
+        st.caption(f"异常 {len(vessel_risk)} 航次 · 涉及 {int(vessel_risk['涉及柜量'].sum())} 柜 · 日期待核实 {int(vessels['船舶状态'].eq('数据待核实').sum())} 航次 · 缺少船舶识别字段 {missing_identity} 柜")
+        st.dataframe(vessel_risk,hide_index=True,use_container_width=True)
+        with st.expander("全部船舶到港状态（含数据待核实）"):
+            st.dataframe(vessels,hide_index=True,use_container_width=True)
+        st.download_button("下载异常航次 CSV",vessel_risk.to_csv(index=False).encode("utf-8-sig"),"vessel_alerts.csv","text/csv")
+        st.markdown("#### 最终港/站货柜到达异常")
         risk=detail.loc[detail["逾期未记录到港"]]
         st.metric("ETA已过未记录到达",len(risk))
         st.dataframe(risk[[k for k in ["排柜单号","箱号","最终港/站","统计日期","港后拖车行","到港状态"] if k in risk]],hide_index=True,use_container_width=True)
