@@ -134,18 +134,19 @@ def show_container_detail(data):
     st.caption("铁路到站采用ATA日期，卸柜采用目的港/站卸柜日期；海运到港采用卸货港ATA日期。还空截止日按系统现有预计还柜时间口径，超期为日历天差，不代表确认罚金。")
     if any(f not in row.index for f in ("ATD日期","卸货港ATA日期")):
         st.info("请重新导入全量源表以补齐海运日期字段。")
+    field_labels = {"还箱地点": "还空地址"}
     groups = [
         ("货柜基础信息", ["箱号","排柜单号","MB/L No.","目的仓物流区域","目的仓","目的仓国家"]),
         ("港前运输信息", ["货代","港前拖车行","ETDDATE"]),
         ("港后 · 海运及铁路运输信息", ["船公司","实际船名","实际航次","ATD日期","卸货港","卸货港ETA日期","卸货港ATA日期","目的地","ETA日期","ATA日期"]),
         ("港后 · 清关与提柜信息", ["目的港预计卸柜时间","目的港/站卸柜日期","海关放行时间","清关完成时间","进口查验开始日期","进口查验完成日期","可提柜时间","LFD","进口实际提箱时间"]),
         ("港后 · 拖车送仓信息", ["港后拖车行","约仓时间","实际送仓时间","实际到海外仓日期"]),
-        ("港后 · 还空信息", ["预计还柜时间","实际还柜日期","港后内部备注"])]
+        ("港后 · 还空信息", ["还箱地点","预计还柜时间","实际还柜日期","港后内部备注"])]
     for i in range(0,len(groups),2):
         cols = st.columns(2)
         for col,(heading,fields) in zip(cols,groups[i:i+2]):
             with col:
                 with st.container(border=True):
                     st.markdown(f'<div style="font-size:14px;font-weight:600">{escape(heading)}</div>',unsafe_allow_html=True)
-                    st.markdown('<div style="font-size:12px;line-height:1.5">'+''.join(f'<div style="display:grid;grid-template-columns:minmax(100px,40%) 1fr;gap:8px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.22)"><span style="color:#64748b">{escape(f)}</span><span style="overflow-wrap:anywhere">{escape(val(f))}</span></div>' for f in fields)+'</div>',unsafe_allow_html=True)
+                    st.markdown('<div style="font-size:12px;line-height:1.5">'+''.join(f'<div style="display:grid;grid-template-columns:minmax(100px,40%) 1fr;gap:8px;padding:5px 0;border-bottom:1px solid rgba(148,163,184,.22)"><span style="color:#64748b">{escape(field_labels.get(f, f))}</span><span style="overflow-wrap:anywhere">{escape(val(f))}</span></div>' for f in fields)+'</div>',unsafe_allow_html=True)
     st.caption("注意：未记录不代表未发生；LFD风险基于Excel中的日期推算，不能代替码头实时核实。")
