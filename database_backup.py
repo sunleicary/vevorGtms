@@ -1,4 +1,4 @@
-"""Administrator-only consistent SQLite backups for one-time Neon migration.
+"""Administrator-only consistent SQLite backups.
 
 Backups are built in a temporary directory with sqlite3.Connection.backup(),
 packaged in memory, and never written to the Git repository.
@@ -41,11 +41,13 @@ def show_database_backup(user):
         else:
             missing.append(filename)
             st.write(f"✗ {filename} — 当前实例中不存在")
-    if missing:
-        st.error("缺少数据库：" + "、".join(missing) + "。为避免误以为备份完整，已禁止生成压缩包。")
+    if not found:
+        st.error("当前实例没有可备份的数据库。")
         return
+    if missing:
+        st.warning("将生成部分备份。缺少数据库：" + "、".join(missing) + "。")
 
-    if st.button("生成三个数据库的一致性备份", type="primary", key="prepare_sqlite_backup"):
+    if st.button("生成当前数据库备份", type="primary", key="prepare_sqlite_backup"):
         try:
             with st.spinner("正在生成 SQLite 快照并压缩，请勿刷新页面..."):
                 output = io.BytesIO()
@@ -65,18 +67,22 @@ def show_database_backup(user):
                                 archive.write(target, arcname=filename)
                             finally:
                                 source.close()
+                        included = "、".join(filename for filename, _ in found)
+                        omitted = "、".join(missing) or "无"
+                        archive.writestr("backup_manifest.txt", f"包含：{included}\n缺少：{omitted}\n")
                 st.session_state["sqlite_backup_zip"] = output.getvalue()
                 st.session_state["sqlite_backup_filename"] = (
-                    "vevortms-sqlite-backup-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S") + "-UTC.zip"
+                    ("sqlite-backup-partial-" if missing else "sqlite-backup-")
+                    + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S") + "-UTC.zip"
                 )
-            st.success("三个数据库的快照已生成并通过完整性检查。")
+            st.success(f"已生成 {len(found)} 个数据库快照并通过完整性检查。")
         except Exception:
             st.session_state.pop("sqlite_backup_zip", None)
             st.session_state.pop("sqlite_backup_filename", None)
             st.error("备份生成失败，请检查服务器数据库状态及可用内存。")
     if "sqlite_backup_zip" in st.session_state:
         st.download_button(
-            "下载三个 SQLite 数据库 ZIP",
+            "下载 SQLite 备份 ZIP",
             data=st.session_state["sqlite_backup_zip"],
             file_name=st.session_state["sqlite_backup_filename"],
             mime="application/zip",
