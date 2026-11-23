@@ -301,8 +301,22 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     )
     with tab_plan:
         st.markdown("#### 每日港口船舶到港计划")
-        st.caption("按当前所选区域和ETA筛选范围，逐日、逐卸货港展示船舶挂靠航次；航班号使用原始数据的「实际航次」字段。")
-        planned = vessels.loc[vessels["计划到港ETA"].notna()].copy()
+        st.caption("区域取货柜「目的仓物流区域」，具体港口取「卸货港」；全美总览按实际目的区域分别展示。航班号使用「实际航次」。")
+        destination_rows = carrier_rows.copy()
+        destination_rows["目的仓物流区域"] = destination_rows.get(
+            "目的仓物流区域", pd.Series("", index=destination_rows.index)
+        ).fillna("").astype(str).str.strip().replace("", "未记录")
+        region_vessels = []
+        for destination_region, region_rows in destination_rows.groupby("目的仓物流区域"):
+            calls, _ = build_vessel_alerts(region_rows, today)
+            if not calls.empty:
+                calls["区域"] = destination_region
+                region_vessels.append(calls)
+        planned = (
+            pd.concat(region_vessels, ignore_index=True)
+            if region_vessels else pd.DataFrame(columns=list(vessels.columns) + ["区域"])
+        )
+        planned = planned.loc[planned["计划到港ETA"].notna()].copy()
         if planned.empty:
             st.info("当前范围无有效船舶计划日期。")
         else:
@@ -314,10 +328,10 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
             # One vessel call = carrier + vessel + voyage + discharge port.
             # build_vessel_alerts already de-duplicates these identifiers.
             daily_port = (
-                planned.groupby(["计划到港ETA", "卸货港"], dropna=False)
+                planned.groupby(["计划到港ETA", "区域", "卸货港"], dropna=False)
                 .agg(计划到港船舶=("船舶状态", "size"), 实际已到港船舶=("已实际到港", "sum"))
                 .reset_index()
-                .sort_values(["计划到港ETA", "卸货港"])
+                .sort_values(["计划到港ETA", "区域", "卸货港"])
             )
             daily = (
                 daily_port.groupby("计划到港ETA", as_index=False)
@@ -329,17 +343,16 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
             c3.metric("涉及卸货港", f"{planned['卸货港'].nunique():,}")
             st.markdown("**每日到港统计（按具体卸货港）**")
             daily_port_display = daily_port.copy()
-            daily_port_display.insert(1, "区域", region.replace("🇺🇸 ", "").replace("🗽 ", "").replace("🛳️ ", "").replace("⚓ ", "").replace("🚛 ", "").replace("🚆 ", "").replace("🏭 ", ""))
             daily_port_display["计划到港ETA日期"] = daily_port_display.pop("计划到港ETA").dt.strftime("%Y-%m-%d")
             daily_port_display = daily_port_display.rename(columns={"卸货港": "具体港口名称"})
             daily_port_display = daily_port_display[["计划到港ETA日期", "区域", "具体港口名称", "计划到港船舶", "实际已到港船舶"]]
             st.dataframe(daily_port_display, hide_index=True, use_container_width=True)
             st.markdown("**船舶到港明细**")
-            details = planned.sort_values(["计划到港ETA", "卸货港", "船公司", "实际船名", "实际航次"]).reset_index(drop=True)
+            details = planned.sort_values(["计划到港ETA", "区域", "卸货港", "船公司", "实际船名", "实际航次"]).reset_index(drop=True)
             details_display = pd.DataFrame({
                 "序号": range(1, len(details) + 1),
                 "计划ETA到港日期": details["计划到港ETA"].dt.strftime("%Y-%m-%d"),
-                "区域": [region.replace("🇺🇸 ", "").replace("🗽 ", "").replace("🛳️ ", "").replace("⚓ ", "").replace("🚛 ", "").replace("🚆 ", "").replace("🏭 ", "")] * len(details),
+                "区域": details["区域"].to_numpy(),
                 "具体港口名称": details["卸货港"].to_numpy(),
                 "航司": details["船公司"].to_numpy(),
                 "航班号": details["实际航次"].to_numpy(),
@@ -347,7 +360,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
             st.dataframe(details_display, hide_index=True, use_container_width=True)
             st.download_button("下载每日到港计划明细 CSV", details_display.to_csv(index=False).encode("utf-8-sig"), "daily_vessel_arrival_plan.csv", "text/csv", key="daily_arrival_plan_csv")
             st.download_button("下载每日港口到港统计 CSV", daily_port_display.to_csv(index=False).encode("utf-8-sig"), "daily_port_arrival_summary.csv", "text/csv", key="daily_port_arrival_csv")
-            st.caption("实际已到港按海运「卸货港ATA日期」确认，且不晚于今天；日期冲突的航次不计入实际已到港。计划日期使用「卸货港ETA日期」。同一船舶在不同卸货港挂靠分别计数。")
+            st.caption("同一航次发往多个目的区域时分别计入各区域，跨区域合计不是全美去重航次数。实际已到港按海运「卸货港ATA日期」确认，且不晚于今天；日期冲突的航次不计入实际已到港。计划日期使用「卸货港ETA日期」。同一船舶在不同卸货港挂靠分别计数。")
     with tab_vessel:
         st.markdown("#### 单日集中到港监控")
         concentrated=[]
