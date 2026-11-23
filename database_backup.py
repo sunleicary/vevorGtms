@@ -15,7 +15,7 @@ import streamlit as st
 
 from import_data import DB as PORT_DB
 from monthly_supplier_entry import DB as KPI_DB
-from auth import AUTH_DB
+from auth import AUTH_DB, is_admin
 
 DATABASES = (
     ("port_ops.db", PORT_DB),
@@ -25,7 +25,7 @@ DATABASES = (
 
 
 def show_database_backup(user):
-    if not user or user.get("role") != "管理员":
+    if not user or not is_admin(user):
         st.error("权限不足：仅管理员可备份数据库。")
         st.stop()
 
