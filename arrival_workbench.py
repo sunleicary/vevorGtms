@@ -72,8 +72,8 @@ def render_schematic(summary, country="US"):
         "亚特兰大铁路站": ("54%", "43%", True),
     }
     if country == "CA":
-        # Stylized offline silhouette: mainland and Arctic islands.
-        outline = "M42,85 L105,65 L143,39 L190,48 L215,75 L260,62 L290,82 L322,69 L345,102 L375,92 L402,120 L425,106 L450,132 L474,112 L499,143 L535,128 L550,160 L578,152 L600,183 L630,170 L650,202 L680,210 L698,238 L675,260 L642,249 L620,272 L593,265 L570,287 L540,276 L510,294 L480,275 L450,283 L410,260 L380,249 L340,249 L300,249 L260,249 L220,249 L180,249 L145,249 L110,240 L83,219 L66,185 L45,160 Z M200,24 L250,12 L275,32 L245,49 Z M300,18 L345,8 L380,35 L350,56 Z M402,22 L450,10 L480,48 L450,75 L415,58 Z M505,44 L540,30 L560,62 L535,90 Z M630,120 L665,110 L685,145 L660,165 Z"
+        # Natural Earth 1:110m public-domain country geometry, projected to EPSG:3347 and simplified.
+        outline = "M207,236 L201,220 L195,213 L197,184 L206,175 L206,140 L196,140 L193,123 L241,74 L246,86 L270,90 L271,99 L277,96 L274,102 L294,115 L291,122 L307,131 L317,123 L328,133 L339,128 L343,138 L349,125 L343,117 L347,104 L368,138 L371,118 L382,122 L385,137 L373,142 L350,176 L344,199 L353,213 L395,224 L411,251 L414,240 L406,226 L417,209 L405,195 L401,169 L415,165 L432,170 L446,187 L451,168 L473,190 L496,192 L512,203 L501,226 L474,239 L461,272 L483,244 L495,263 L503,264 L510,259 L511,249 L518,254 L495,285 L498,270 L485,276 L477,264 L469,264 L463,286 L446,291 L408,325 L405,297 L372,278 L280,264 L207,236 Z M385,173 L383,168 L388,167 Z M375,84 L354,82 L347,64 L360,76 L377,76 Z M515,208 L517,221 L533,216 L545,231 L536,227 L534,236 L514,242 L511,217 Z M373,148 L393,161 L383,159 L376,168 L370,165 Z M380,101 L410,104 L418,111 L415,116 L438,121 L439,136 L424,132 L441,148 L442,153 L428,150 L441,159 L407,150 L396,153 L409,144 L407,127 L387,114 L372,117 L359,109 L362,92 L367,89 L368,99 L375,89 Z M349,87 L358,89 L349,103 L346,96 Z M301,59 L311,53 L316,54 L312,61 Z M185,183 L192,182 L186,195 Z M335,46 L342,51 L342,58 L334,53 Z M203,238 L194,231 L191,211 L200,221 Z M291,69 L306,83 L282,93 L280,84 Z M325,63 L327,78 L315,79 L317,74 L307,69 L314,62 L323,73 Z M323,92 L332,116 L327,125 L318,120 L298,119 L292,106 L305,107 L293,101 L299,98 L292,93 L306,85 L305,89 L316,91 L317,101 Z M331,98 L337,88 L343,90 L339,108 Z M343,67 L343,80 L339,81 L336,69 Z M350,38 L354,33 L360,40 L359,56 L353,56 Z M355,28 L372,15 L385,17 L375,70 L359,70 L361,59 L366,61 L361,41 L368,38 L360,39 Z M339,116 L343,127 L334,121 Z M483,238 L491,236 L498,238 L489,239 Z M496,261 L498,259 L506,256 L504,261 Z"
         positions = {
             "鲁珀特王子港": ("1%", "9%", False),
             "温哥华港": ("1%", "61%", False),
@@ -94,7 +94,8 @@ def render_schematic(summary, country="US"):
             f'<div class="gtms-map-arrived">已到 <b>{arrived:,}</b></div>'
             f'<div class="gtms-map-transit">在途 <b>{total-arrived:,}</b></div></div>'
         )
-    svg=f'<svg viewBox="0 0 730 340" preserveAspectRatio="xMidYMid meet" role="img" aria-label="{country_label}地理背景" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gtmsLand" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#e4ebf0"/><stop offset="1" stop-color="#d2dee8"/></linearGradient></defs><path d="{outline}" fill="url(#gtmsLand)" stroke="#a3b6c6" stroke-width="1.4" transform="translate(0 8)"/></svg>'
+    map_transform = "translate(-125 -10) scale(1.35 1.02)" if country == "CA" else "translate(0 8)"
+    svg=f'<svg viewBox="0 0 730 340" preserveAspectRatio="xMidYMid meet" role="img" aria-label="{country_label}地理背景" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gtmsLand" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#e4ebf0"/><stop offset="1" stop-color="#d2dee8"/></linearGradient></defs><path d="{outline}" fill="url(#gtmsLand)" stroke="#a3b6c6" stroke-width="1.4" transform="{map_transform}"/></svg>'
     st.markdown(
         '<style>'
         '.gtms-static-map{position:relative;width:100%;height:340px;overflow:hidden;border:1px solid #d8e3ec;border-radius:8px;background:linear-gradient(155deg,#f8fbfd,#edf4f9)}'
@@ -106,7 +107,7 @@ def render_schematic(summary, country="US"):
         '</style><div class="gtms-static-map">'+svg+''.join(cards)+'</div>',
         unsafe_allow_html=True,
     )
-    st.caption(f"静态{country_label}地理示意图（非精确地图） · 数字来自当前筛选数据 · 橙色为海运港口，蓝色为铁路站场。")
+    st.caption(("加拿大真实地理轮廓 · Natural Earth 公共领域地理数据（低分辨率）" if country == "CA" else "静态美国地理示意图") + " · 数字来自当前筛选数据 · 橙色为海运港口，蓝色为铁路站场。")
 
 
 
