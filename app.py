@@ -27,7 +27,8 @@ from drayage_master import show_drayage_master
 from postport_do_assignment import show_do_assignment
 from contract_rates import show_contract_rates
 from logistics_ai import show_logistics_ai
-from arrival_workbench import default_arrival_eta_range, show_arrival_workbench, CANADA_COUNTRIES
+from arrival_workbench import default_arrival_eta_range, show_arrival_workbench
+CANADA_COUNTRIES = {"加拿大", "ca", "can", "canada"}
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -379,7 +380,13 @@ df = scope.copy()
 if selected_supplier not in ("美国所有拖车商", "全部拖车商"):
     df = df[df["港后拖车行"].fillna("").astype(str).str.strip().eq(selected_supplier)].copy()
 if page in ("港口与铁路到站动态监控中心", "港口与铁路到站动态监控中心-加拿大"):
-    show_arrival_workbench(df, eta_range=eta_range, eta_enabled=eta_enabled, country=country_scope)
+    import inspect
+    if "country" in inspect.signature(show_arrival_workbench).parameters:
+        show_arrival_workbench(df, eta_range=eta_range, eta_enabled=eta_enabled, country=country_scope)
+    elif country_scope == "CA":
+        st.warning("加拿大监控模块尚未加载最新版本，请在 Streamlit Cloud 重启应用后重试。")
+    else:
+        show_arrival_workbench(df, eta_range=eta_range, eta_enabled=eta_enabled)
     st.stop()
 if eta_enabled:
     if eta_range is not None and len(eta_range) == 2:
