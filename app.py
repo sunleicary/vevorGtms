@@ -27,7 +27,7 @@ from drayage_master import show_drayage_master
 from postport_do_assignment import show_do_assignment
 from contract_rates import show_contract_rates
 from logistics_ai import show_logistics_ai
-from arrival_workbench import default_arrival_eta_range, show_arrival_workbench
+from arrival_workbench import default_arrival_eta_range, show_arrival_workbench, CANADA_COUNTRIES
 from intelligent_operations import show_intelligent_lfd, show_ai_fee_review, show_supplier_capacity
 
 st.set_page_config(page_title="司顺国际物流港后运营工作台", page_icon="🚢", layout="wide")
@@ -335,12 +335,24 @@ with st.sidebar:
         country_names.loc[non_us].replace("", "国家未填写")
         + " / " + df.loc[non_us, "目的仓物流区域"].fillna("区域未填写").astype(str)
     )
+    ca_mask = country_names.str.casefold().isin(CANADA_COUNTRIES)
+    country_scope = "US"
+    if page == "港口与铁路到站动态监控中心":
+        country_scope = st.radio("监控国家", ["US", "CA"], format_func=lambda c: "🇺🇸 美国" if c == "US" else "🇨🇦 加拿大", horizontal=True, key="arrival_country")
     region_options = ["美国所有区域", "全球所有区域"] + sorted(
         set(df["运营区域选项"].dropna().tolist()) - {"美国所有区域", "全球所有区域"}
     )
+    if page == "港口与铁路到站动态监控中心" and country_scope == "CA":
+        region_options = ["加拿大所有区域"] + sorted(set(df.loc[ca_mask, "运营区域选项"].dropna()))
+    elif page == "港口与铁路到站动态监控中心":
+        region_options = ["美国所有区域"] + sorted(set(df.loc[us_mask, "运营区域选项"].dropna()) - {"美国所有区域"})
+    if st.session_state.get("gtms_filter_region") not in region_options:
+        st.session_state["gtms_filter_region"] = region_options[0]
     selected_region = st.selectbox("运营区域", region_options, key="gtms_filter_region")
     if selected_region == "美国所有区域":
         scope = df.loc[us_mask]
+    elif selected_region == "加拿大所有区域":
+        scope = df.loc[ca_mask]
     elif selected_region == "全球所有区域":
         scope = df
     else:
@@ -369,7 +381,7 @@ df = scope.copy()
 if selected_supplier not in ("美国所有拖车商", "全部拖车商"):
     df = df[df["港后拖车行"].fillna("").astype(str).str.strip().eq(selected_supplier)].copy()
 if page == "港口与铁路到站动态监控中心":
-    show_arrival_workbench(df, eta_range=eta_range, eta_enabled=eta_enabled)
+    show_arrival_workbench(df, eta_range=eta_range, eta_enabled=eta_enabled, country=country_scope)
     st.stop()
 if eta_enabled:
     if eta_range is not None and len(eta_range) == 2:
