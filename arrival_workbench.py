@@ -12,13 +12,24 @@ NODES = {
     "亚特兰大铁路站": (33.75,-84.43,r"亚特兰大|atlanta|\bUSATL\b|\bATL\b"),
 }
 
-def build_arrivals(frame, today):
+CANADA_NODES = {
+    "温哥华港": (49.29,-123.11,r"温哥华|vancouver|\bCAVAN\b"),
+    "鲁珀特王子港": (54.31,-130.32,r"鲁珀特|prince[ _-]*rupert|\bCAPRR\b"),
+    "蒙特利尔港": (45.51,-73.55,r"蒙特利尔|montreal|montréal|\bCAMTR\b"),
+    "哈利法克斯港": (44.65,-63.57,r"哈利法克斯|halifax|\bCAHAL\b"),
+    "多伦多铁路站": (43.75,-79.4,r"多伦多|toronto|\bCATOR\b"),
+    "卡尔加里铁路站": (51.04,-114.07,r"卡尔加里|calgary|\bCACAL\b"),
+}
+CANADA_COUNTRIES = {"加拿大","ca","can","canada"}
+
+def build_arrivals(frame, today, country="US"):
+    nodes = CANADA_NODES if country == "CA" else NODES
     z=frame.copy()
     def txt(col):
         return z.get(col,pd.Series("",index=z.index)).fillna("").astype(str).str.strip()
     def dt(col):
         return pd.to_datetime(txt(col),errors="coerce",format="mixed").dt.normalize()
-    z=z.loc[txt("目的仓国家").str.casefold().isin(["美国","us","usa","america","united states","united states of america"])].copy()
+    z=z.loc[txt("目的仓国家").str.casefold().isin(CANADA_COUNTRIES if country == "CA" else ["美国","us","usa","america","united states","united states of america"])].copy()
     calc=dt("ETA（计算）").fillna(dt("ETA(计算)"))
     z["统计日期"]=dt("ETA日期").fillna(dt("目的港预计卸柜时间")).fillna(calc)
     z["日期来源"]="ETA日期"
@@ -42,13 +53,13 @@ def build_arrivals(frame, today):
     z.loc[z["缺少ETA且未记录到港"],"到港状态"]="缺少ETA"
     z["最终港/站"]="其他/待核实"
     dest=txt("目的地")
-    hits=pd.DataFrame({name:dest.str.contains(pattern,case=False,regex=True) for name,(_,_,pattern) in NODES.items()},index=z.index)
-    for name in NODES:
+    hits=pd.DataFrame({name:dest.str.contains(pattern,case=False,regex=True) for name,(_,_,pattern) in nodes.items()},index=z.index)
+    for name in nodes:
         z.loc[hits[name]&hits.sum(axis=1).eq(1),"最终港/站"]=name
     return z
 
 
-def render_schematic(summary):
+def render_schematic(summary, country="US"):
     """Static geographic image background and live overlay cards; no map service."""
     import html
     outline = "M38,24 L370,24 L380,28 L412,34 L451,32 L494,49 L508,62 L526,89 L515,107 L565,98 L568,89 L590,89 L614,72 L654,72 L681,43 L699,47 L699,64 L708,74 L671,88 L662,104 L672,112 L625,123 L613,145 L606,139 L600,165 L603,185 L596,194 L563,210 L536,235 L536,252 L551,289 L547,310 L538,310 L518,277 L520,269 L508,253 L491,256 L475,247 L437,250 L439,262 L421,262 L393,255 L376,258 L346,278 L343,292 L346,302 L324,296 L300,259 L282,255 L275,264 L265,261 L252,244 L234,231 L213,231 L213,236 L180,236 L135,219 L107,222 L90,204 L65,197 L19,128 L21,108 L18,99 L25,66 L16,34 L35,36 L41,47 L44,44 Z"
@@ -60,6 +71,18 @@ def render_schematic(summary):
         "芝加哥铁路站": ("48%", "7%", True),
         "亚特兰大铁路站": ("54%", "43%", True),
     }
+    if country == "CA":
+        # Stylized offline silhouette: mainland and Arctic islands.
+        outline = "M42,85 L105,65 L143,39 L190,48 L215,75 L260,62 L290,82 L322,69 L345,102 L375,92 L402,120 L425,106 L450,132 L474,112 L499,143 L535,128 L550,160 L578,152 L600,183 L630,170 L650,202 L680,210 L698,238 L675,260 L642,249 L620,272 L593,265 L570,287 L540,276 L510,294 L480,275 L450,283 L410,260 L380,249 L340,249 L300,249 L260,249 L220,249 L180,249 L145,249 L110,240 L83,219 L66,185 L45,160 Z M200,24 L250,12 L275,32 L245,49 Z M300,18 L345,8 L380,35 L350,56 Z M402,22 L450,10 L480,48 L450,75 L415,58 Z M505,44 L540,30 L560,62 L535,90 Z M630,120 L665,110 L685,145 L660,165 Z"
+        positions = {
+            "鲁珀特王子港": ("1%", "9%", False),
+            "温哥华港": ("1%", "61%", False),
+            "卡尔加里铁路站": ("25%", "40%", True),
+            "多伦多铁路站": ("49%", "66%", True),
+            "蒙特利尔港": ("55%", "13%", False),
+            "哈利法克斯港": ("78%", "46%", False),
+        }
+    country_label = "加拿大" if country == "CA" else "美国"
     cards=[]
     for name,(left,top,rail) in positions.items():
         total=int(summary.loc[name,"总柜量"])
@@ -71,7 +94,7 @@ def render_schematic(summary):
             f'<div class="gtms-map-arrived">已到 <b>{arrived:,}</b></div>'
             f'<div class="gtms-map-transit">在途 <b>{total-arrived:,}</b></div></div>'
         )
-    svg=f'<svg viewBox="0 0 730 340" preserveAspectRatio="xMidYMid meet" role="img" aria-label="美国本土地理背景" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gtmsLand" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#e4ebf0"/><stop offset="1" stop-color="#d2dee8"/></linearGradient></defs><path d="{outline}" fill="url(#gtmsLand)" stroke="#a3b6c6" stroke-width="1.4" transform="translate(0 8)"/></svg>'
+    svg=f'<svg viewBox="0 0 730 340" preserveAspectRatio="xMidYMid meet" role="img" aria-label="{country_label}地理背景" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gtmsLand" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#e4ebf0"/><stop offset="1" stop-color="#d2dee8"/></linearGradient></defs><path d="{outline}" fill="url(#gtmsLand)" stroke="#a3b6c6" stroke-width="1.4" transform="translate(0 8)"/></svg>'
     st.markdown(
         '<style>'
         '.gtms-static-map{position:relative;width:100%;height:340px;overflow:hidden;border:1px solid #d8e3ec;border-radius:8px;background:linear-gradient(155deg,#f8fbfd,#edf4f9)}'
@@ -83,7 +106,7 @@ def render_schematic(summary):
         '</style><div class="gtms-static-map">'+svg+''.join(cards)+'</div>',
         unsafe_allow_html=True,
     )
-    st.caption("静态美国地理背景 · 数字来自当前筛选数据 · 橙色为海运港口，蓝色为铁路站场。")
+    st.caption(f"静态{country_label}地理示意图（非精确地图） · 数字来自当前筛选数据 · 橙色为海运港口，蓝色为铁路站场。")
 
 
 
@@ -148,13 +171,15 @@ def build_vessel_alerts(rows, today, tolerance=1):
     return pd.DataFrame(result,columns=keys+["计划到港ETA","实际到港ATA","到港偏差天数","涉及柜量","船舶状态"]),missing_identity
 
 
-def vessel_port_groups(vessels):
+def vessel_port_groups(vessels, country="US"):
     port_groups=[
         ("洛杉矶/长滩港",NODES["洛杉矶/长滩港"][2]),
         ("纽约/新泽西港",NODES["纽约/新泽西港"][2]),
         ("萨凡纳港",NODES["萨凡纳港"][2]),
         ("休斯顿港",NODES["休斯顿港"][2]),
     ]
+    if country == "CA":
+        port_groups = [(name, values[2]) for name, values in CANADA_NODES.items() if name.endswith("港")]
     port_names=vessels["卸货港"].fillna("").astype(str)
     assigned=pd.Series(False,index=vessels.index)
     groups=[]
@@ -183,9 +208,11 @@ def default_arrival_eta_range(today):
     )
 
 
-def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
+def show_arrival_workbench(frame, eta_range=None, eta_enabled=True, country="US"):
+    nodes = CANADA_NODES if country == "CA" else NODES
+    country_label = "加拿大" if country == "CA" else "美国"
     today=pd.Timestamp(date.today())
-    all_rows=build_arrivals(frame,today)
+    all_rows=build_arrivals(frame,today,country)
     st.markdown("""<style>
 [data-testid="stMain"]:has(.arrival-page-title) {font-size:14px}
 [data-testid="stMain"]:has(.arrival-page-title) :is(h1,h2,h3,h4,h5,h6,p,label,button,[role="tab"],[data-baseweb="select"],[data-baseweb="select"] span,[data-testid="stMetricValue"],[data-testid="stMetricValue"] div,[data-testid="stMetricLabel"] p,[data-testid="stCaptionContainer"] p) {font-size:14px!important;line-height:1.5!important}
@@ -211,7 +238,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         start,end=(valid.min(),valid.max()) if not valid.empty else (today,today)
     st.caption(f"ETA统计窗口：{start.date()} 至 {end.date()}（含起止日）" if eta_enabled else "ETA不限（含缺失日期记录）")
     flags=["已到港/站","预计到港/站","逾期未记录到港","缺少ETA且未记录到港","已卸柜","已提柜","已送仓","已还空"]
-    labels=list(NODES)+["其他/待核实"]
+    labels=list(nodes)+["其他/待核实"]
     summary=z.groupby("最终港/站").agg(总柜量=("排柜单号","size"),**{k:(k,"sum") for k in flags}).reindex(labels,fill_value=0)
     missing=all_rows[all_rows["缺少ETA且未记录到港"]].copy()
     summary["未记录实际到港/站"]=summary["总柜量"]-summary["已到港/站"]
@@ -222,17 +249,17 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     vessels,missing_identity=build_vessel_alerts(z,today)
     vessel_risk=vessels[vessels["船舶状态"].isin(["延误到港","逾期未确认到港"])]
     cols=st.columns(5)
-    for c,(name,val) in zip(cols,[("全美总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("船舶异常航次",f"{len(vessel_risk):,}"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
+    for c,(name,val) in zip(cols,[(country_label+"总柜量",f"{len(z):,}"),("已到港/站",f"{arrived:,}"),("在途柜量",f"{len(z)-arrived:,}"),("船舶异常航次",f"{len(vessel_risk):,}"),("ETA已过待核实",f"{int(z['逾期未记录到港'].sum()):,}")]):
         c.metric(name,val,help="按船司、船名、航次、卸货港去重；海运ATA或当前日期超过卸货港ETA一天。缺失或冲突日期单列待核实。" if name=="船舶异常航次" else None)
-    groups = vessel_port_groups(vessels)
+    groups = vessel_port_groups(vessels,country)
     left,right=st.columns([2,1])
     with left:
         with st.container(border=True):
-            st.markdown("#### 美国港口与铁路站场")
-            render_schematic(summary)
+            st.markdown(f"#### {country_label}港口与铁路站场")
+            render_schematic(summary,country)
     with right:
         with st.container(border=True):
-            st.markdown("#### 美国港口船舶到港监控")
+            st.markdown(f"#### {country_label}港口船舶到港监控")
             confirmed=vessels["实际到港ATA"].notna() & vessels["船舶状态"].ne("数据待核实")
             pending=vessels["船舶状态"].isin(["计划到港","逾期未确认到港"])
             total=len(vessels)
@@ -264,6 +291,8 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
         "🚆 芝加哥 CHI": "芝加哥铁路站",
         "🏭 亚特兰大 ATL": "亚特兰大铁路站",
     }
+    if country == "CA":
+        region_options = {"🇨🇦 加拿大总览": None, **{name: name for name in nodes}}
     st.markdown("""
 <style>
 .st-key-arrival_analysis_region [role="radiogroup"] {
@@ -285,7 +314,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
 """, unsafe_allow_html=True)
     region = st.radio(
         "分析区域", list(region_options), horizontal=True,
-        label_visibility="collapsed", key="arrival_analysis_region",
+        label_visibility="collapsed", key="arrival_analysis_region" if country == "US" else "arrival_analysis_region_ca",
     )
     node = region_options[region]
     carrier_rows = z
@@ -301,7 +330,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
     )
     with tab_plan:
         st.markdown("#### 每日港口船舶到港计划")
-        st.caption("区域取货柜「目的仓物流区域」，具体港口取「卸货港」；全美总览按实际目的区域分别展示。航班号使用「实际航次」。")
+        st.caption("区域取货柜「目的仓物流区域」，具体港口取「卸货港」；国家总览按实际目的区域分别展示。航班号使用「实际航次」。")
         destination_rows = carrier_rows.copy()
         destination_rows["目的仓物流区域"] = destination_rows.get(
             "目的仓物流区域", pd.Series("", index=destination_rows.index)
@@ -360,7 +389,7 @@ def show_arrival_workbench(frame, eta_range=None, eta_enabled=True):
             st.dataframe(details_display, hide_index=True, use_container_width=True)
             st.download_button("下载每日到港计划明细 CSV", details_display.to_csv(index=False).encode("utf-8-sig"), "daily_vessel_arrival_plan.csv", "text/csv", key="daily_arrival_plan_csv")
             st.download_button("下载每日港口到港统计 CSV", daily_port_display.to_csv(index=False).encode("utf-8-sig"), "daily_port_arrival_summary.csv", "text/csv", key="daily_port_arrival_csv")
-            st.caption("同一航次发往多个目的区域时分别计入各区域，跨区域合计不是全美去重航次数。实际已到港按海运「卸货港ATA日期」确认，且不晚于今天；日期冲突的航次不计入实际已到港。计划日期使用「卸货港ETA日期」。同一船舶在不同卸货港挂靠分别计数。")
+            st.caption("同一航次发往多个目的区域时分别计入各区域，跨区域合计不是全国去重航次数。实际已到港按海运「卸货港ATA日期」确认，且不晚于今天；日期冲突的航次不计入实际已到港。计划日期使用「卸货港ETA日期」。同一船舶在不同卸货港挂靠分别计数。")
     with tab_vessel:
         st.markdown("#### 单日集中到港监控")
         concentrated=[]
