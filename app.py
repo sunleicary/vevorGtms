@@ -79,7 +79,7 @@ with st.sidebar:
     # Business domains; labels are kept separate from legacy handlers.
     navigation = {
         "港后运营管理": [
-            "港后运营工作台", "港口与铁路到站动态监控中心", "货柜详细信息查询", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理",
+            "港后运营工作台", "港口与铁路到站动态监控中心", "港口与铁路到站动态监控中心-加拿大", "货柜详细信息查询", "物流AI助理", "港后拖车商DO分配", "港后LFD智能预警管理",
             "港后供应商产能与计划管理", "港后供应商绩效KPI管理",
         ],
         "港后拖车行结算管理": [
@@ -336,15 +336,13 @@ with st.sidebar:
         + " / " + df.loc[non_us, "目的仓物流区域"].fillna("区域未填写").astype(str)
     )
     ca_mask = country_names.str.casefold().isin(CANADA_COUNTRIES)
-    country_scope = "US"
-    if page == "港口与铁路到站动态监控中心":
-        country_scope = st.radio("监控国家", ["US", "CA"], format_func=lambda c: "🇺🇸 美国" if c == "US" else "🇨🇦 加拿大", horizontal=True, key="arrival_country")
+    country_scope = "CA" if page == "港口与铁路到站动态监控中心-加拿大" else "US"
     region_options = ["美国所有区域", "全球所有区域"] + sorted(
         set(df["运营区域选项"].dropna().tolist()) - {"美国所有区域", "全球所有区域"}
     )
-    if page == "港口与铁路到站动态监控中心" and country_scope == "CA":
+    if page == "港口与铁路到站动态监控中心-加拿大":
         region_options = ["加拿大所有区域"] + sorted(set(df.loc[ca_mask, "运营区域选项"].dropna()))
-    elif page == "港口与铁路到站动态监控中心":
+    elif page in ("港口与铁路到站动态监控中心", "港口与铁路到站动态监控中心-加拿大"):
         region_options = ["美国所有区域"] + sorted(set(df.loc[us_mask, "运营区域选项"].dropna()) - {"美国所有区域"})
     if st.session_state.get("gtms_filter_region") not in region_options:
         st.session_state["gtms_filter_region"] = region_options[0]
@@ -369,9 +367,9 @@ with st.sidebar:
     eta_range = None
     if eta_enabled:
         today_filter = date.today()
-        if page == "港口与铁路到站动态监控中心":
+        if page in ("港口与铁路到站动态监控中心", "港口与铁路到站动态监控中心-加拿大"):
             default_eta_range = default_arrival_eta_range(today_filter)
-            eta_range_key = "gtms_arrival_eta_range"
+            eta_range_key = "gtms_arrival_eta_range_ca" if country_scope == "CA" else "gtms_arrival_eta_range"
         else:
             default_eta_range = (today_filter - timedelta(days=14), today_filter + timedelta(days=14))
             eta_range_key = "gtms_filter_eta_range"
@@ -380,7 +378,7 @@ with st.sidebar:
 df = scope.copy()
 if selected_supplier not in ("美国所有拖车商", "全部拖车商"):
     df = df[df["港后拖车行"].fillna("").astype(str).str.strip().eq(selected_supplier)].copy()
-if page == "港口与铁路到站动态监控中心":
+if page in ("港口与铁路到站动态监控中心", "港口与铁路到站动态监控中心-加拿大"):
     show_arrival_workbench(df, eta_range=eta_range, eta_enabled=eta_enabled, country=country_scope)
     st.stop()
 if eta_enabled:
